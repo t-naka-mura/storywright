@@ -93,4 +93,5 @@ Story
 - [ADR-006](adr/ADR-006-ui-architecture.md) — UI/UXアーキテクチャ
 - [ADR-007](adr/ADR-007-canvas-interaction.md) — キャンバス操作とステップ編集
 - [ADR-008](adr/ADR-008-test-execution-and-persistence.md) — テスト実行・結果表示・永続化
+- [ADR-009](adr/ADR-009-electron-migration-and-interactive-recorder.md) — Electron 移行とインタラクティブレコーダー
 - [design-philosophy.md](design-philosophy.md) — デザイン思想

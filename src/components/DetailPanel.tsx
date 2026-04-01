@@ -1,43 +1,55 @@
-import type { Edge } from "@xyflow/react";
-
-interface Step {
-  order: number;
-  action: string;
-  target: string;
-  value?: string;
-}
+import { useState } from "react";
+import type { Story, Step, StoryResult } from "../types";
+import { StepEditor } from "./StepEditor";
 
 interface DetailPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedEdge: Edge | null;
+  story: Story | null;
+  storyResult: StoryResult | null;
+  onUpdateStory: (story: Story) => void;
+  onRunStory: (story: Story) => void;
+  isRunning: boolean;
 }
 
-const dummySteps: Record<string, { title: string; steps: Step[] }> = {
-  "login-flow": {
-    title: "ログインフロー",
-    steps: [
-      { order: 1, action: "navigate", target: "/login" },
-      { order: 2, action: "type", target: "#email", value: "test@example.com" },
-      { order: 3, action: "type", target: "#password", value: "********" },
-      { order: 4, action: "click", target: ".submit-btn" },
-      { order: 5, action: "assert", target: ".dashboard-title", value: "ダッシュボード" },
-    ],
-  },
-  "signup-flow": {
-    title: "新規登録フロー",
-    steps: [
-      { order: 1, action: "navigate", target: "/signup" },
-      { order: 2, action: "type", target: "#name", value: "テスト太郎" },
-      { order: 3, action: "type", target: "#email", value: "test@example.com" },
-      { order: 4, action: "click", target: ".register-btn" },
-      { order: 5, action: "assert", target: ".welcome", value: "ようこそ" },
-    ],
-  },
-};
+function createEmptyStep(order: number): Step {
+  return { order, action: "click", target: "", value: "", description: "" };
+}
 
-export function DetailPanel({ isOpen, onClose, selectedEdge }: DetailPanelProps) {
-  const story = selectedEdge ? dummySteps[selectedEdge.id] : null;
+export function DetailPanel({
+  isOpen,
+  onClose,
+  story,
+  storyResult,
+  onUpdateStory,
+  onRunStory,
+  isRunning,
+}: DetailPanelProps) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+
+  const handleAddStep = () => {
+    if (!story) return;
+    const newStep = createEmptyStep(story.steps.length + 1);
+    const updated = { ...story, steps: [...story.steps, newStep] };
+    onUpdateStory(updated);
+    setEditingIndex(story.steps.length);
+  };
+
+  const handleUpdateStep = (index: number, step: Step) => {
+    if (!story) return;
+    const steps = story.steps.map((s, i) => (i === index ? step : s));
+    onUpdateStory({ ...story, steps });
+    setEditingIndex(null);
+  };
+
+  const handleDeleteStep = (index: number) => {
+    if (!story) return;
+    const steps = story.steps
+      .filter((_, i) => i !== index)
+      .map((s, i) => ({ ...s, order: i + 1 }));
+    onUpdateStory({ ...story, steps });
+    setEditingIndex(null);
+  };
 
   return (
     <aside className={`detail-panel${isOpen ? "" : " collapsed"}`}>
@@ -52,20 +64,74 @@ export function DetailPanel({ isOpen, onClose, selectedEdge }: DetailPanelProps)
 
       <div className="panel-body">
         {story ? (
-          <ol className="step-list">
-            {story.steps.map((step) => (
-              <li key={step.order} className="step-item">
-                <span className="step-order">{step.order}</span>
-                <div className="step-content">
-                  <span className="step-action">{step.action}</span>
-                  <span className="step-detail">
-                    {step.target}
-                    {step.value ? ` → ${step.value}` : ""}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ol>
+          <>
+            <div className="panel-field">
+              <label className="panel-field-label">Base URL（空欄はグローバル設定を使用）</label>
+              <input
+                className="panel-field-input"
+                value={story.baseUrl ?? ""}
+                onChange={(e) =>
+                  onUpdateStory({
+                    ...story,
+                    baseUrl: e.target.value || undefined,
+                  })
+                }
+                placeholder="https://..."
+              />
+            </div>
+            <ol className="step-list">
+              {story.steps.map((step, index) => {
+                const result = storyResult?.stepResults.find(
+                  (r) => r.order === step.order,
+                );
+                return (
+                  <li key={step.order}>
+                    {editingIndex === index ? (
+                      <StepEditor
+                        step={step}
+                        onSave={(s) => handleUpdateStep(index, s)}
+                        onCancel={() => setEditingIndex(null)}
+                        onDelete={() => handleDeleteStep(index)}
+                      />
+                    ) : (
+                      <div
+                        className={`step-item ${result ? `step-${result.status}` : ""}`}
+                        onClick={() => setEditingIndex(index)}
+                      >
+                        <span className={`step-order ${result ? `step-order-${result.status}` : ""}`}>
+                          {result?.status === "passed"
+                            ? "✓"
+                            : result?.status === "failed"
+                              ? "✗"
+                              : step.order}
+                        </span>
+                        <div className="step-content">
+                          <span className="step-action">{step.action}</span>
+                          <span className="step-detail">
+                            {step.target}
+                            {step.value ? ` → ${step.value}` : ""}
+                          </span>
+                          {result?.error && (
+                            <span className="step-error">{result.error}</span>
+                          )}
+                        </div>
+                        {result && (
+                          <span className="step-duration">{result.durationMs}ms</span>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <button
+              className="btn btn-add-step"
+              type="button"
+              onClick={handleAddStep}
+            >
+              + ステップ追加
+            </button>
+          </>
         ) : (
           <p className="panel-empty">
             エッジ（ストーリー）をクリックすると
@@ -77,11 +143,13 @@ export function DetailPanel({ isOpen, onClose, selectedEdge }: DetailPanelProps)
 
       {story && (
         <div className="panel-actions">
-          <button className="btn btn-primary" type="button">
-            ▶ Run
-          </button>
-          <button className="btn" type="button">
-            Edit
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={() => onRunStory(story)}
+            disabled={isRunning || story.steps.length === 0}
+          >
+            {isRunning ? "⏳ Running..." : "▶ Run"}
           </button>
         </div>
       )}

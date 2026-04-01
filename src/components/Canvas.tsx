@@ -1,74 +1,74 @@
-import { useCallback } from "react";
+import { useMemo } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
-  addEdge,
-  useNodesState,
-  useEdgesState,
   type Edge,
   type Node,
+  type OnNodesChange,
+  type OnEdgesChange,
   type OnConnect,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ScreenNode } from "./ScreenNode";
+import { EditableEdgeLabel } from "./EditableEdgeLabel";
 
 const nodeTypes = { screen: ScreenNode };
-
-const initialNodes: Node[] = [
-  {
-    id: "login",
-    type: "screen",
-    position: { x: 80, y: 80 },
-    data: { label: "ログイン画面", url: "/login" },
-  },
-  {
-    id: "dashboard",
-    type: "screen",
-    position: { x: 400, y: 40 },
-    data: { label: "ダッシュボード", url: "/dashboard" },
-  },
-  {
-    id: "signup",
-    type: "screen",
-    position: { x: 400, y: 200 },
-    data: { label: "新規登録画面", url: "/signup" },
-  },
-];
-
-const initialEdges: Edge[] = [
-  { id: "login-flow", source: "login", target: "dashboard", label: "ログイン" },
-  { id: "signup-flow", source: "login", target: "signup", label: "新規登録" },
-];
-
-let edgeIdCounter = 0;
+const edgeTypes = { editableEdge: EditableEdgeLabel };
 
 interface CanvasProps {
+  nodes: Node[];
+  edges: Edge[];
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: OnConnect;
   onEdgeClick: (edge: Edge) => void;
+  onUpdateNode: (nodeId: string, data: { label: string; url: string }) => void;
+  onUpdateEdgeLabel: (edgeId: string, label: string) => void;
 }
 
-export function Canvas({ onEdgeClick }: CanvasProps) {
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+export function Canvas({
+  nodes,
+  edges,
+  onNodesChange,
+  onEdgesChange,
+  onConnect,
+  onEdgeClick,
+  onUpdateNode,
+  onUpdateEdgeLabel,
+}: CanvasProps) {
+  const nodesWithCallbacks = useMemo(
+    () =>
+      nodes.map((node) => ({
+        ...node,
+        data: { ...node.data, onUpdate: onUpdateNode },
+      })),
+    [nodes, onUpdateNode],
+  );
 
-  const onConnect: OnConnect = useCallback(
-    (connection) => {
-      const id = `edge-${++edgeIdCounter}`;
-      setEdges((eds) => addEdge({ ...connection, id, label: "新しいストーリー" }, eds));
-    },
-    [setEdges],
+  const edgesWithLabels = useMemo(
+    () =>
+      edges.map((edge) => ({
+        ...edge,
+        label: undefined,
+        data: { ...edge.data, label: edge.label as string, onUpdateLabel: onUpdateEdgeLabel },
+        type: "editableEdge" as const,
+      })),
+    [edges, onUpdateEdgeLabel],
   );
 
   return (
     <div className="canvas-container">
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={nodesWithCallbacks}
+        edges={edgesWithLabels}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onEdgeClick={(_event, edge) => onEdgeClick(edge)}
+        deleteKeyCode={["Backspace", "Delete"]}
         fitView
         proOptions={{ hideAttribution: true }}
       >

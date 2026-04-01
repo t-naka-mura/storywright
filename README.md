@@ -1,27 +1,43 @@
-# Tauri + React + Typescript
+# Storywright
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Figma / Google Spreadsheet からユーザーストーリーを作成し、E2Eテストを実施できる Electron デスクトップアプリ。
 
-## Recommended IDE Setup
+## スタック
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- **フロントエンド**: React 19 + TypeScript + Vite
+- **バックエンド**: Electron (Node.js)
+- **E2Eテスト**: Playwright（main process で直接実行）
+- **パッケージマネージャ**: pnpm
 
-## 使い方
+## セットアップ
 
-### 開発モードで起動
-
-```
+```bash
 pnpm install
-pnpm tauri dev
 ```
 
-### 本番ビルド・本番相当の動作確認
+## 開発モードで起動
+
+```bash
+pnpm dev
+```
+
+Vite の開発サーバーと Electron が同時に起動します。
+
+## 本番ビルド
+
+```bash
+pnpm build
+```
+
+## プロジェクト構成
 
 ```
-pnpm tauri build
+src/           # React フロントエンド
+electron/      # Electron main process + preload
+docs/ai/       # 設計ドキュメント・仕様・ADR
+public/        # 静的アセット
 ```
-ビルド後、生成された実行ファイル（`src-tauri/target/release/` など）を直接起動してください。
 
-### Rust未導入の場合
+## 推奨エディタ
 
-[Rust公式サイト](https://www.rust-lang.org/ja/tools/install) または asdf などのバージョン管理ツールで Rust をインストールしてください。
+- [VS Code](https://code.visualstudio.com/)

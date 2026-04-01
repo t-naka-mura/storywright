@@ -1,8 +1,0 @@
-{
-  "name": "storywright-runner",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "playwright": "^1.52.0"
-  }
-}

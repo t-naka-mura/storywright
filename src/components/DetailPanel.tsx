@@ -10,6 +10,9 @@ interface DetailPanelProps {
   onUpdateStory: (story: Story) => void;
   onRunStory: (story: Story) => void;
   isRunning: boolean;
+  mainView: "canvas" | "preview";
+  standaloneStories: Story[];
+  onAssignStory?: (standaloneStoryId: string) => void;
 }
 
 function createEmptyStep(order: number): Step {
@@ -28,6 +31,9 @@ export function DetailPanel({
   onUpdateStory,
   onRunStory,
   isRunning,
+  mainView,
+  standaloneStories,
+  onAssignStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -159,6 +165,25 @@ export function DetailPanel({
                 placeholder="https://..."
               />
             </div>
+            {standaloneStories.length > 0 && story.steps.length === 0 && onAssignStory && (
+              <div className="panel-field">
+                <label className="panel-field-label">録画済みストーリーを割り当て</label>
+                <select
+                  className="panel-field-input"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) onAssignStory(e.target.value);
+                  }}
+                >
+                  <option value="">選択してください...</option>
+                  {standaloneStories.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}（{s.steps.length} ステップ）
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <ol className="step-list">
               {story.steps.map((step, index) => {
                 const result = storyResult?.stepResults.find(
@@ -242,9 +267,19 @@ export function DetailPanel({
           </>
         ) : (
           <p className="panel-empty">
-            エッジ（ストーリー）をクリックすると
-            <br />
-            ステップが表示されます
+            {mainView === "preview" ? (
+              <>
+                ● REC を押して録画を開始するか、
+                <br />
+                Canvas でストーリーを選択してください
+              </>
+            ) : (
+              <>
+                エッジ（ストーリー）をクリックすると
+                <br />
+                ステップが表示されます
+              </>
+            )}
           </p>
         )}
       </div>

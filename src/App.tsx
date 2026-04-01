@@ -65,6 +65,7 @@ const initialStories: Record<string, Story> = {
 
 let nodeIdCounter = 0;
 let edgeIdCounter = 0;
+let storyIdCounter = 0;
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -83,8 +84,12 @@ function App() {
   const unsubRecorderRef = useRef<(() => void) | null>(null);
   const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
-  const selectedStory = selectedEdgeId ? stories[selectedEdgeId] ?? null : null;
-  const selectedResult = selectedEdgeId ? results[selectedEdgeId] ?? null : null;
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+
+  // selectedStoryId を優先し、フォールバックで selectedEdgeId を使う
+  const activeStoryId = selectedStoryId ?? selectedEdgeId;
+  const selectedStory = activeStoryId ? stories[activeStoryId] ?? null : null;
+  const selectedResult = activeStoryId ? results[activeStoryId] ?? null : null;
 
   const handleAddNode = useCallback(() => {
     const id = `screen-${++nodeIdCounter}`;
@@ -134,6 +139,7 @@ function App() {
   const handleEdgeClick = useCallback(
     (_edge: Edge) => {
       setSelectedEdgeId(_edge.id);
+      setSelectedStoryId(null);
       if (!isPanelOpen) setIsPanelOpen(true);
     },
     [isPanelOpen],
@@ -168,15 +174,26 @@ function App() {
   }, [baseUrl]);
 
   const handleStartRecording = useCallback(async () => {
-    if (!selectedStory) return;
+    // Story が未選択ならスタンドアロン Story を自動生成
+    let targetStoryId = activeStoryId;
+    if (!targetStoryId) {
+      const now = new Date();
+      const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const id = `story-${++storyIdCounter}`;
+      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [] };
+      setStories((prev) => ({ ...prev, [id]: newStory }));
+      setSelectedStoryId(id);
+      targetStoryId = id;
+    }
+
+    const recordingStoryId = targetStoryId;
     setRecordedStepCount(0);
     setIsRecording(true);
 
     // ステップ受信リスナーを登録
     const unsub = window.storywright.onRecorderStep((step: RecordedStep) => {
-      if (!selectedEdgeId) return;
       setStories((prev) => {
-        const story = prev[selectedEdgeId];
+        const story = prev[recordingStoryId];
         if (!story) return prev;
         const newStep = {
           order: story.steps.length + 1,
@@ -185,7 +202,7 @@ function App() {
           value: step.value,
           description: "",
         };
-        return { ...prev, [selectedEdgeId]: { ...story, steps: [...story.steps, newStep] } };
+        return { ...prev, [recordingStoryId]: { ...story, steps: [...story.steps, newStep] } };
       });
       setRecordedStepCount((c) => c + 1);
     });
@@ -203,7 +220,7 @@ function App() {
       setIsRecording(false);
       setError({ title: "録画開始エラー", message: String(err) });
     }
-  }, [selectedStory, selectedEdgeId, baseUrl]);
+  }, [activeStoryId]);
 
   const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
@@ -238,6 +255,26 @@ function App() {
     };
   }, []);
 
+  // スタンドアロン Story（エッジに紐づかない Story）の一覧
+  const edgeIds = new Set(edges.map((e) => e.id));
+  const standaloneStories = Object.values(stories).filter(
+    (s) => !edgeIds.has(s.id) && s.steps.length > 0,
+  );
+
+  // スタンドアロン Story のステップをエッジの Story にコピーし、元を削除
+  const handleAssignStory = useCallback((standaloneStoryId: string) => {
+    if (!activeStoryId) return;
+    setStories((prev) => {
+      const source = prev[standaloneStoryId];
+      const target = prev[activeStoryId];
+      if (!source || !target) return prev;
+      const next = { ...prev };
+      next[activeStoryId] = { ...target, steps: [...source.steps] };
+      delete next[standaloneStoryId];
+      return next;
+    });
+  }, [activeStoryId]);
+
   const handleTogglePanel = useCallback(() => {
     setIsPanelOpen((prev) => !prev);
   }, []);
@@ -263,7 +300,7 @@ function App() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onToggleAssertMode={handleToggleAssertMode}
-        canRecord={selectedStory !== null}
+        canRecord={/^https?:\/\//.test(previewUrl)}
       />
       <div className="main-area">
         {mainView === "canvas" ? (
@@ -288,6 +325,9 @@ function App() {
           onUpdateStory={handleUpdateStory}
           onRunStory={handleRunStory}
           isRunning={isRunning}
+          mainView={mainView}
+          standaloneStories={standaloneStories}
+          onAssignStory={handleAssignStory}
         />
       </div>
       <StatusBar nodeCount={nodes.length} edgeCount={edges.length} isRecording={isRecording} isAssertMode={isAssertMode} />

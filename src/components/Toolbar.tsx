@@ -90,7 +90,7 @@ export function Toolbar({
               type="button"
               onClick={onStartRecording}
               disabled={!canRecord}
-              title={canRecord ? "録画開始" : "ストーリーを選択してください"}
+              title={canRecord ? "録画開始" : "Base URL を入力してください"}
             >
               ● REC
             </button>

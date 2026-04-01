@@ -68,7 +68,6 @@ public/        # 静的アセット
 
 ## Git 運用
 
-- デフォルトブランチ: master
-- 開発ブランチ: development から機能ブランチを切る
+- デフォルトブランチ: main
 - commit: `/commit` コマンドでのみ実行可能
 - push: AIは実行禁止。必ず人間が手動で行う

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { Story, Step, StoryResult } from "../types";
 import { StepEditor } from "./StepEditor";
 
@@ -16,6 +16,10 @@ function createEmptyStep(order: number): Step {
   return { order, action: "click", target: "", value: "", description: "" };
 }
 
+function renumberSteps(steps: Step[]): Step[] {
+  return steps.map((s, i) => ({ ...s, order: i + 1 }));
+}
+
 export function DetailPanel({
   isOpen,
   onClose,
@@ -26,6 +30,9 @@ export function DetailPanel({
   isRunning,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const dragCounter = useRef(0);
 
   const handleAddStep = () => {
     if (!story) return;
@@ -33,6 +40,24 @@ export function DetailPanel({
     const updated = { ...story, steps: [...story.steps, newStep] };
     onUpdateStory(updated);
     setEditingIndex(story.steps.length);
+  };
+
+  const handleInsertStep = (atIndex: number) => {
+    if (!story) return;
+    const newStep = createEmptyStep(0);
+    const steps = [...story.steps];
+    steps.splice(atIndex, 0, newStep);
+    onUpdateStory({ ...story, steps: renumberSteps(steps) });
+    setEditingIndex(atIndex);
+  };
+
+  const handleDuplicateStep = (index: number) => {
+    if (!story) return;
+    const original = story.steps[index];
+    const copy = { ...original, order: 0, description: original.description };
+    const steps = [...story.steps];
+    steps.splice(index + 1, 0, copy);
+    onUpdateStory({ ...story, steps: renumberSteps(steps) });
   };
 
   const handleUpdateStep = (index: number, step: Step) => {
@@ -49,6 +74,61 @@ export function DetailPanel({
       .map((s, i) => ({ ...s, order: i + 1 }));
     onUpdateStory({ ...story, steps });
     setEditingIndex(null);
+  };
+
+  // --- Drag & Drop ---
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragIndex !== null && index !== dragIndex) {
+      setDropTargetIndex(index);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    dragCounter.current++;
+    if (dragIndex !== null && index !== dragIndex) {
+      setDropTargetIndex(index);
+    }
+  };
+
+  const handleDragLeave = () => {
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      setDropTargetIndex(null);
+      dragCounter.current = 0;
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    if (!story || dragIndex === null || dragIndex === toIndex) {
+      setDragIndex(null);
+      setDropTargetIndex(null);
+      return;
+    }
+    const steps = [...story.steps];
+    const [moved] = steps.splice(dragIndex, 1);
+    steps.splice(toIndex, 0, moved);
+    onUpdateStory({ ...story, steps: renumberSteps(steps) });
+    setDragIndex(null);
+    setDropTargetIndex(null);
+    setEditingIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDropTargetIndex(null);
+    dragCounter.current = 0;
   };
 
   return (
@@ -85,7 +165,17 @@ export function DetailPanel({
                   (r) => r.order === step.order,
                 );
                 return (
-                  <li key={step.order}>
+                  <li key={`${step.order}-${index}`}>
+                    {/* 中間挿入ボタン */}
+                    <div className="step-insert-zone">
+                      <button
+                        className="btn-insert"
+                        type="button"
+                        onClick={() => handleInsertStep(index)}
+                      >
+                        + 挿入
+                      </button>
+                    </div>
                     {editingIndex === index ? (
                       <StepEditor
                         step={step}
@@ -95,9 +185,16 @@ export function DetailPanel({
                       />
                     ) : (
                       <div
-                        className={`step-item ${result ? `step-${result.status}` : ""}`}
-                        onClick={() => setEditingIndex(index)}
+                        className={`step-item ${result ? `step-${result.status}` : ""} ${dragIndex === index ? "step-dragging" : ""} ${dropTargetIndex === index ? "step-drop-target" : ""}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnter={(e) => handleDragEnter(e, index)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index)}
+                        onDragEnd={handleDragEnd}
                       >
+                        <span className="step-drag-handle" title="ドラッグで並び替え">⠿</span>
                         <span className={`step-order ${result ? `step-order-${result.status}` : ""}`}>
                           {result?.status === "passed"
                             ? "✓"
@@ -105,7 +202,7 @@ export function DetailPanel({
                               ? "✗"
                               : step.order}
                         </span>
-                        <div className="step-content">
+                        <div className="step-content" onClick={() => setEditingIndex(index)}>
                           <span className="step-action">{step.action}</span>
                           <span className="step-detail">
                             {step.target}
@@ -115,6 +212,17 @@ export function DetailPanel({
                             <span className="step-error">{result.error}</span>
                           )}
                         </div>
+                        <button
+                          className="btn-duplicate"
+                          type="button"
+                          title="ステップを複製"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicateStep(index);
+                          }}
+                        >
+                          ⧉
+                        </button>
                         {result && (
                           <span className="step-duration">{result.durationMs}ms</span>
                         )}

@@ -623,6 +623,86 @@ body,
   color: #ffffff;
 }
 
+/* Drag handle */
+.step-drag-handle {
+  cursor: grab;
+  color: var(--color-border);
+  font-size: 14px;
+  flex-shrink: 0;
+  user-select: none;
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.step-drag-handle:hover {
+  color: var(--color-text-secondary);
+}
+
+.step-item:active .step-drag-handle {
+  cursor: grabbing;
+}
+
+/* Drag states */
+.step-dragging {
+  opacity: 0.4;
+}
+
+.step-drop-target {
+  border-top: 2px solid var(--color-accent);
+}
+
+/* Duplicate button */
+.btn-duplicate {
+  background: none;
+  border: none;
+  color: var(--color-border);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  line-height: 1;
+}
+
+.btn-duplicate:hover {
+  color: var(--color-accent);
+}
+
+/* Insert zone between steps */
+.step-insert-zone {
+  height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-insert {
+  display: none;
+  position: absolute;
+  top: -10px;
+  z-index: 1;
+  padding: 1px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.step-insert-zone:hover .btn-insert,
+li:hover + li .step-insert-zone .btn-insert {
+  display: block;
+}
+
+.btn-insert:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
 .btn-add-step {
   width: 100%;
   margin-top: 8px;

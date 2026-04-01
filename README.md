@@ -8,8 +8,7 @@
 
 > **Future extension**: Figma / Google Spreadsheet からのストーリーインポートを予定
 
-<!-- スクリーンショットを追加する場合: docs/images/screenshot.png に配置 -->
-<!-- ![Storywright Screenshot](docs/images/screenshot.png) -->
+![Storywright Screenshot](docs/images/screenshot.png)
 
 ## スタック
 

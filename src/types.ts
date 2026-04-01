@@ -27,7 +27,7 @@ export type StoryResult = {
 };
 
 export interface RecordedStep {
-  action: "navigate" | "click" | "type";
+  action: "navigate" | "click" | "type" | "select" | "assert";
   target: string;
   value: string;
   timestamp: number;
@@ -40,7 +40,9 @@ export interface StorywrightAPI {
   closePreview: () => Promise<void>;
   startRecording: (url: string) => Promise<void>;
   stopRecording: () => Promise<void>;
+  toggleAssertMode: (enabled: boolean) => Promise<void>;
   onRecorderStep: (callback: (step: RecordedStep) => void) => () => void;
+  onAssertDone: (callback: () => void) => () => void;
 }
 
 declare global {

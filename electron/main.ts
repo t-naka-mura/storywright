@@ -129,6 +129,27 @@ const RECORDER_INJECTION_SCRIPT = `
 (function() {
   if (window.__storywrightRecorder) return;
   window.__storywrightRecorder = true;
+  window.__storywrightAssertMode = false;
+
+  // === セレクタ生成 ===
+
+  function getLabelsFor(el) {
+    // label[for=id] or ancestor label
+    if (el.id) {
+      var label = document.querySelector('label[for="' + el.id + '"]');
+      if (label) return label.textContent.trim();
+    }
+    var parent = el.closest('label');
+    if (parent) return parent.textContent.trim();
+    return null;
+  }
+
+  function nthChildIndex(el) {
+    var siblings = el.parentElement ? Array.from(el.parentElement.children) : [];
+    var sameTag = siblings.filter(function(s) { return s.tagName === el.tagName; });
+    if (sameTag.length <= 1) return '';
+    return ':nth-child(' + (Array.from(el.parentElement.children).indexOf(el) + 1) + ')';
+  }
 
   function generateSelector(el) {
     // 1. data-testid
@@ -136,35 +157,53 @@ const RECORDER_INJECTION_SCRIPT = `
       return '[data-testid="' + el.dataset.testid + '"]';
     }
     // 2. role + accessible name
-    var role = el.getAttribute('role') || el.tagName.toLowerCase();
     var ariaLabel = el.getAttribute('aria-label');
     if (ariaLabel) {
+      var role = el.getAttribute('role') || el.tagName.toLowerCase();
       return 'role=' + role + '[name="' + ariaLabel + '"]';
     }
-    // 3. text content (buttons, links)
+    // 3. label text (for input/select/textarea)
+    var tag = el.tagName.toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+      var labelText = getLabelsFor(el);
+      if (labelText && labelText.length <= 50) {
+        return 'label:has-text("' + labelText + '") >> ' + tag;
+      }
+    }
+    // 4. placeholder
+    if (el.placeholder && el.placeholder.length <= 50) {
+      return '[placeholder="' + el.placeholder + '"]';
+    }
+    // 5. text content (buttons, links)
     if ((el.tagName === 'BUTTON' || el.tagName === 'A') && el.textContent) {
       var text = el.textContent.trim();
       if (text.length > 0 && text.length <= 50) {
         return 'text="' + text + '"';
       }
     }
-    // 4. id
+    // 6. id
     if (el.id) {
       return '#' + el.id;
     }
-    // 5. CSS selector fallback
+    // 7. CSS selector fallback (improved)
     var parts = [];
     var current = el;
     while (current && current !== document.body && parts.length < 4) {
-      var tag = current.tagName.toLowerCase();
+      var ctag = current.tagName.toLowerCase();
+      var segment = ctag;
+      // type attribute for inputs
+      var typeAttr = current.getAttribute('type');
+      if (ctag === 'input' && typeAttr) {
+        segment = ctag + '[type="' + typeAttr + '"]';
+      }
       var classes = Array.from(current.classList).filter(function(c) {
         return !/^[0-9]/.test(c) && c.length < 30;
       }).slice(0, 2);
       if (classes.length > 0) {
-        parts.unshift(tag + '.' + classes.join('.'));
-      } else {
-        parts.unshift(tag);
+        segment = ctag + '.' + classes.join('.');
       }
+      segment += nthChildIndex(current);
+      parts.unshift(segment);
       current = current.parentElement;
     }
     return parts.join(' > ');
@@ -174,8 +213,74 @@ const RECORDER_INJECTION_SCRIPT = `
     console.debug('__storywright_step__' + JSON.stringify(data));
   }
 
-  // click capture
+  // === アサートモード ===
+
+  var highlightedEl = null;
+  var originalOutline = '';
+
+  function clearHighlight() {
+    if (highlightedEl) {
+      highlightedEl.style.outline = originalOutline;
+      highlightedEl = null;
+      originalOutline = '';
+    }
+  }
+
+  function handleAssertMouseover(e) {
+    if (!window.__storywrightAssertMode) return;
+    var target = e.target;
+    if (!target || !target.tagName || target === highlightedEl) return;
+    clearHighlight();
+    highlightedEl = target;
+    originalOutline = target.style.outline;
+    target.style.outline = '2px solid #5b7bd7';
+  }
+
+  function handleAssertMouseout(e) {
+    if (!window.__storywrightAssertMode) return;
+    if (e.target === highlightedEl) {
+      clearHighlight();
+    }
+  }
+
+  function handleAssertClick(e) {
+    if (!window.__storywrightAssertMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    var target = e.target;
+    if (!target || !target.tagName) return;
+
+    var textContent = (target.textContent || '').trim();
+    sendStep({
+      action: 'assert',
+      target: generateSelector(target),
+      value: textContent,
+      timestamp: Date.now()
+    });
+
+    // アサートモード解除
+    clearHighlight();
+    window.__storywrightAssertMode = false;
+    console.debug('__storywright_assert_done__');
+  }
+
+  document.addEventListener('mouseover', handleAssertMouseover, true);
+  document.addEventListener('mouseout', handleAssertMouseout, true);
+  document.addEventListener('click', handleAssertClick, true);
+
+  // アサートモード切替用のグローバル関数
+  window.__storywrightSetAssertMode = function(enabled) {
+    window.__storywrightAssertMode = enabled;
+    if (!enabled) clearHighlight();
+  };
+
+  // === 通常の録画キャプチャ ===
+
+  // click capture (アサートモードでない時のみ)
   document.addEventListener('click', function(e) {
+    if (window.__storywrightAssertMode) return;
     var target = e.target;
     if (!target || !target.tagName) return;
     sendStep({
@@ -184,15 +289,16 @@ const RECORDER_INJECTION_SCRIPT = `
       value: '',
       timestamp: Date.now()
     });
-  }, true);
+  }, false);
 
   // type capture (debounced per element)
   var inputTimers = new WeakMap();
   function handleInput(e) {
+    if (window.__storywrightAssertMode) return;
     var target = e.target;
     if (!target || !target.tagName) return;
-    var tag = target.tagName.toLowerCase();
-    if (tag !== 'input' && tag !== 'textarea' && !target.isContentEditable) return;
+    var itag = target.tagName.toLowerCase();
+    if (itag !== 'input' && itag !== 'textarea' && !target.isContentEditable) return;
 
     if (inputTimers.has(target)) clearTimeout(inputTimers.get(target));
     inputTimers.set(target, setTimeout(function() {
@@ -206,6 +312,19 @@ const RECORDER_INJECTION_SCRIPT = `
     }, 500));
   }
   document.addEventListener('input', handleInput, true);
+
+  // select capture
+  document.addEventListener('change', function(e) {
+    if (window.__storywrightAssertMode) return;
+    var target = e.target;
+    if (!target || target.tagName !== 'SELECT') return;
+    sendStep({
+      action: 'select',
+      target: generateSelector(target),
+      value: target.value,
+      timestamp: Date.now()
+    });
+  }, true);
 })();
 `;
 
@@ -243,7 +362,7 @@ function setupRecorderOnPreview() {
     }
   });
 
-  // click/type キャプチャ (console.debug 経由)
+  // click/type/select/assert キャプチャ (console.debug 経由)
   wc.on("console-message", (_event, level, message) => {
     if (!isRecording) return;
     if (level === 2 && message.startsWith("__storywright_step__")) {
@@ -253,6 +372,10 @@ function setupRecorderOnPreview() {
       } catch {
         // パース失敗は無視
       }
+    }
+    // アサートモード完了通知
+    if (level === 2 && message === "__storywright_assert_done__") {
+      mainWindow?.webContents.send("recorder:assert-done");
     }
   });
 }
@@ -329,6 +452,13 @@ function registerIpcHandlers() {
   ipcMain.handle("stop-recording", async () => {
     isRecording = false;
     teardownRecorder();
+  });
+
+  ipcMain.handle("toggle-assert-mode", async (_event, enabled: boolean) => {
+    if (!previewWindow || previewWindow.isDestroyed()) return;
+    previewWindow.webContents
+      .executeJavaScript(`window.__storywrightSetAssertMode(${enabled})`)
+      .catch(() => {});
   });
 
   ipcMain.handle("run-story", async (_event, storyJson: string) => {

@@ -207,6 +207,23 @@ body,
   background: #c04040;
 }
 
+/* Assert button */
+.btn-assert {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.btn-assert:hover {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-assert-active {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
 /* === Main Area === */
 .main-area {
   display: flex;
@@ -650,6 +667,11 @@ body,
 
 .status-dot-recording {
   background: var(--color-error);
+  animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+.status-dot-assert {
+  background: var(--color-accent);
   animation: recording-pulse 1.5s ease-in-out infinite;
 }
 

@@ -9,8 +9,10 @@ interface ToolbarProps {
   mainView: MainView;
   onMainViewChange: (view: MainView) => void;
   isRecording: boolean;
+  isAssertMode: boolean;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onToggleAssertMode: () => void;
   canRecord: boolean;
 }
 
@@ -23,8 +25,10 @@ export function Toolbar({
   mainView,
   onMainViewChange,
   isRecording,
+  isAssertMode,
   onStartRecording,
   onStopRecording,
+  onToggleAssertMode,
   canRecord,
 }: ToolbarProps) {
   return (
@@ -63,13 +67,23 @@ export function Toolbar({
         />
         {mainView === "preview" && (
           isRecording ? (
-            <button
-              className="btn btn-rec btn-rec-active"
-              type="button"
-              onClick={onStopRecording}
-            >
-              ■ Stop
-            </button>
+            <>
+              <button
+                className="btn btn-rec btn-rec-active"
+                type="button"
+                onClick={onStopRecording}
+              >
+                ■ Stop
+              </button>
+              <button
+                className={`btn btn-assert ${isAssertMode ? "btn-assert-active" : ""}`}
+                type="button"
+                onClick={onToggleAssertMode}
+                title="要素をクリックしてアサーションを追加"
+              >
+                ✓ Assert
+              </button>
+            </>
           ) : (
             <button
               className="btn btn-rec"

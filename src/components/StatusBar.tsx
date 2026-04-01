@@ -2,13 +2,19 @@ interface StatusBarProps {
   nodeCount: number;
   edgeCount: number;
   isRecording: boolean;
+  isAssertMode: boolean;
 }
 
-export function StatusBar({ nodeCount, edgeCount, isRecording }: StatusBarProps) {
+export function StatusBar({ nodeCount, edgeCount, isRecording, isAssertMode }: StatusBarProps) {
   return (
     <footer className="status-bar">
       <div className="status-item">
-        {isRecording ? (
+        {isAssertMode ? (
+          <>
+            <span className="status-dot status-dot-assert" />
+            Assert mode — 要素をクリックしてアサーションを追加
+          </>
+        ) : isRecording ? (
           <>
             <span className="status-dot status-dot-recording" />
             Recording...

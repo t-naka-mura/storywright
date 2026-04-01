@@ -78,8 +78,10 @@ function App() {
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [mainView, setMainView] = useState<MainView>("canvas");
   const [isRecording, setIsRecording] = useState(false);
+  const [isAssertMode, setIsAssertMode] = useState(false);
   const [recordedStepCount, setRecordedStepCount] = useState(0);
   const unsubRecorderRef = useRef<(() => void) | null>(null);
+  const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
   const selectedStory = selectedEdgeId ? stories[selectedEdgeId] ?? null : null;
   const selectedResult = selectedEdgeId ? results[selectedEdgeId] ?? null : null;
@@ -190,6 +192,12 @@ function App() {
     });
     unsubRecorderRef.current = unsub;
 
+    // アサート完了リスナー
+    const unsubAssert = window.storywright.onAssertDone(() => {
+      setIsAssertMode(false);
+    });
+    unsubAssertDoneRef.current = unsubAssert;
+
     try {
       await window.storywright.startRecording(url);
     } catch (err) {
@@ -200,8 +208,11 @@ function App() {
 
   const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
+    setIsAssertMode(false);
     unsubRecorderRef.current?.();
     unsubRecorderRef.current = null;
+    unsubAssertDoneRef.current?.();
+    unsubAssertDoneRef.current = null;
     try {
       await window.storywright.stopRecording();
     } catch {
@@ -209,13 +220,22 @@ function App() {
     }
   }, []);
 
+  const handleToggleAssertMode = useCallback(async () => {
+    const next = !isAssertMode;
+    setIsAssertMode(next);
+    try {
+      await window.storywright.toggleAssertMode(next);
+    } catch {
+      // エラーは無視
+    }
+  }, [isAssertMode]);
+
   // 録画中にコンポーネントがアンマウントされた場合のクリーンアップ
   useEffect(() => {
     return () => {
-      if (unsubRecorderRef.current) {
-        unsubRecorderRef.current();
-        window.storywright.stopRecording().catch(() => {});
-      }
+      unsubRecorderRef.current?.();
+      unsubAssertDoneRef.current?.();
+      window.storywright.stopRecording().catch(() => {});
     };
   }, []);
 
@@ -240,8 +260,10 @@ function App() {
         mainView={mainView}
         onMainViewChange={setMainView}
         isRecording={isRecording}
+        isAssertMode={isAssertMode}
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
+        onToggleAssertMode={handleToggleAssertMode}
         canRecord={selectedStory !== null}
       />
       <div className="main-area">
@@ -269,7 +291,7 @@ function App() {
           isRunning={isRunning}
         />
       </div>
-      <StatusBar nodeCount={nodes.length} edgeCount={edges.length} isRecording={isRecording} />
+      <StatusBar nodeCount={nodes.length} edgeCount={edges.length} isRecording={isRecording} isAssertMode={isAssertMode} />
       {error && (
         <ErrorDialog
           title={error.title}

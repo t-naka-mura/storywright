@@ -26,11 +26,21 @@ export type StoryResult = {
   stepResults: StepResult[];
 };
 
+export interface RecordedStep {
+  action: "navigate" | "click" | "type";
+  target: string;
+  value: string;
+  timestamp: number;
+}
+
 // Electron IPC bridge
 export interface StorywrightAPI {
   runStory: (storyJson: string) => Promise<StoryResult>;
   openPreview: (url: string) => Promise<void>;
   closePreview: () => Promise<void>;
+  startRecording: (url: string) => Promise<void>;
+  stopRecording: () => Promise<void>;
+  onRecorderStep: (callback: (step: RecordedStep) => void) => () => void;
 }
 
 declare global {

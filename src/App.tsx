@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   addEdge,
   useNodesState,
@@ -13,7 +13,7 @@ import { PreviewPanel } from "./components/PreviewPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
-import type { Story, StoryResult } from "./types";
+import type { Story, StoryResult, RecordedStep } from "./types";
 import "./App.css";
 
 type MainView = "canvas" | "preview";
@@ -77,6 +77,9 @@ function App() {
   const [baseUrl, setBaseUrl] = useState("https://example.com");
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [mainView, setMainView] = useState<MainView>("canvas");
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedStepCount, setRecordedStepCount] = useState(0);
+  const unsubRecorderRef = useRef<(() => void) | null>(null);
 
   const selectedStory = selectedEdgeId ? stories[selectedEdgeId] ?? null : null;
   const selectedResult = selectedEdgeId ? results[selectedEdgeId] ?? null : null;
@@ -162,6 +165,60 @@ function App() {
     }
   }, [baseUrl]);
 
+  const handleStartRecording = useCallback(async () => {
+    if (!selectedStory) return;
+    const url = selectedStory.baseUrl || baseUrl;
+    setRecordedStepCount(0);
+    setIsRecording(true);
+
+    // ステップ受信リスナーを登録
+    const unsub = window.storywright.onRecorderStep((step: RecordedStep) => {
+      if (!selectedEdgeId) return;
+      setStories((prev) => {
+        const story = prev[selectedEdgeId];
+        if (!story) return prev;
+        const newStep = {
+          order: story.steps.length + 1,
+          action: step.action as Story["steps"][number]["action"],
+          target: step.target,
+          value: step.value,
+          description: "",
+        };
+        return { ...prev, [selectedEdgeId]: { ...story, steps: [...story.steps, newStep] } };
+      });
+      setRecordedStepCount((c) => c + 1);
+    });
+    unsubRecorderRef.current = unsub;
+
+    try {
+      await window.storywright.startRecording(url);
+    } catch (err) {
+      setIsRecording(false);
+      setError({ title: "録画開始エラー", message: String(err) });
+    }
+  }, [selectedStory, selectedEdgeId, baseUrl]);
+
+  const handleStopRecording = useCallback(async () => {
+    setIsRecording(false);
+    unsubRecorderRef.current?.();
+    unsubRecorderRef.current = null;
+    try {
+      await window.storywright.stopRecording();
+    } catch {
+      // 停止エラーは無視
+    }
+  }, []);
+
+  // 録画中にコンポーネントがアンマウントされた場合のクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (unsubRecorderRef.current) {
+        unsubRecorderRef.current();
+        window.storywright.stopRecording().catch(() => {});
+      }
+    };
+  }, []);
+
   const handleTogglePanel = useCallback(() => {
     setIsPanelOpen((prev) => !prev);
   }, []);
@@ -182,6 +239,10 @@ function App() {
         onBaseUrlChange={setBaseUrl}
         mainView={mainView}
         onMainViewChange={setMainView}
+        isRecording={isRecording}
+        onStartRecording={handleStartRecording}
+        onStopRecording={handleStopRecording}
+        canRecord={selectedStory !== null}
       />
       <div className="main-area">
         {mainView === "canvas" ? (
@@ -196,7 +257,7 @@ function App() {
             onUpdateEdgeLabel={handleUpdateEdgeLabel}
           />
         ) : (
-          <PreviewPanel url={previewUrl} />
+          <PreviewPanel url={previewUrl} isRecording={isRecording} recordedStepCount={recordedStepCount} />
         )}
         <DetailPanel
           isOpen={isPanelOpen}
@@ -208,7 +269,7 @@ function App() {
           isRunning={isRunning}
         />
       </div>
-      <StatusBar nodeCount={nodes.length} edgeCount={edges.length} />
+      <StatusBar nodeCount={nodes.length} edgeCount={edges.length} isRecording={isRecording} />
       {error && (
         <ErrorDialog
           title={error.title}

@@ -1,6 +1,8 @@
 # Storywright
 
-Figma / Google Spreadsheet からユーザーストーリーを作成し、E2Eテストを実施できる Electron デスクトップアプリ。
+ユーザーストーリーをキャンバスで設計し、ブラウザ操作の録画から E2E テストを作成・実行できる Electron デスクトップアプリ。
+
+> **Future extension**: Figma / Google Spreadsheet からのストーリーインポートを予定
 
 ## スタック
 

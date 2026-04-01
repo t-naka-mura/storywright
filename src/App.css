@@ -180,6 +180,33 @@ body,
   font-size: 12px;
 }
 
+/* REC button */
+.btn-rec {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  font-weight: 600;
+}
+
+.btn-rec:hover:not(:disabled) {
+  background: var(--color-error);
+  color: #ffffff;
+}
+
+.btn-rec:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-rec-active {
+  background: var(--color-error);
+  color: #ffffff;
+  animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+.btn-rec-active:hover {
+  background: #c04040;
+}
+
 /* === Main Area === */
 .main-area {
   display: flex;
@@ -329,6 +356,18 @@ body,
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", monospace;
   color: var(--color-accent);
+}
+
+.preview-placeholder-recording {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-error);
+  animation: recording-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes recording-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* === Detail Panel === */
@@ -607,6 +646,11 @@ body,
   height: 6px;
   border-radius: 50%;
   background: var(--color-success);
+}
+
+.status-dot-recording {
+  background: var(--color-error);
+  animation: recording-pulse 1.5s ease-in-out infinite;
 }
 
 /* === Error Dialog === */

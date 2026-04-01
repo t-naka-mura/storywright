@@ -2,38 +2,57 @@ import { useEffect, useRef } from "react";
 
 interface PreviewPanelProps {
   url: string;
+  isRecording: boolean;
+  recordedStepCount: number;
 }
 
-export function PreviewPanel({ url }: PreviewPanelProps) {
+export function PreviewPanel({ url, isRecording, recordedStepCount }: PreviewPanelProps) {
   const currentUrlRef = useRef<string>("");
 
   useEffect(() => {
-    window.storywright.openPreview(url).catch((err) => {
-      console.error("Failed to open preview:", err);
-    });
-    currentUrlRef.current = url;
+    if (!isRecording) {
+      window.storywright.openPreview(url).catch((err) => {
+        console.error("Failed to open preview:", err);
+      });
+      currentUrlRef.current = url;
+    }
 
     return () => {
-      window.storywright.closePreview().catch(() => {});
+      if (!isRecording) {
+        window.storywright.closePreview().catch(() => {});
+      }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (url !== currentUrlRef.current) {
+    if (!isRecording && url !== currentUrlRef.current) {
       window.storywright.openPreview(url).catch((err) => {
         console.error("Failed to update preview:", err);
       });
       currentUrlRef.current = url;
     }
-  }, [url]);
+  }, [url, isRecording]);
 
   return (
     <div className="preview-panel">
       <div className="preview-placeholder">
-        <p className="preview-placeholder-text">
-          プレビューウィンドウで表示中
-        </p>
-        <p className="preview-placeholder-url">{url}</p>
+        {isRecording ? (
+          <>
+            <p className="preview-placeholder-recording">
+              ● 録画中... ブラウザで操作してください
+            </p>
+            <p className="preview-placeholder-text">
+              {recordedStepCount} ステップ記録済み
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="preview-placeholder-text">
+              プレビューウィンドウで表示中
+            </p>
+            <p className="preview-placeholder-url">{url}</p>
+          </>
+        )}
       </div>
     </div>
   );

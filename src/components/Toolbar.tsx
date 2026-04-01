@@ -8,6 +8,10 @@ interface ToolbarProps {
   onBaseUrlChange: (url: string) => void;
   mainView: MainView;
   onMainViewChange: (view: MainView) => void;
+  isRecording: boolean;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  canRecord: boolean;
 }
 
 export function Toolbar({
@@ -18,6 +22,10 @@ export function Toolbar({
   onBaseUrlChange,
   mainView,
   onMainViewChange,
+  isRecording,
+  onStartRecording,
+  onStopRecording,
+  canRecord,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -53,6 +61,27 @@ export function Toolbar({
           onChange={(e) => onBaseUrlChange(e.target.value)}
           placeholder="Base URL"
         />
+        {mainView === "preview" && (
+          isRecording ? (
+            <button
+              className="btn btn-rec btn-rec-active"
+              type="button"
+              onClick={onStopRecording}
+            >
+              ■ Stop
+            </button>
+          ) : (
+            <button
+              className="btn btn-rec"
+              type="button"
+              onClick={onStartRecording}
+              disabled={!canRecord}
+              title={canRecord ? "録画開始" : "ストーリーを選択してください"}
+            >
+              ● REC
+            </button>
+          )
+        )}
         <button className="btn" type="button" onClick={onTogglePanel}>
           {isPanelOpen ? "▷" : "◁"} Panel
         </button>

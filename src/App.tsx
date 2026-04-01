@@ -7,7 +7,6 @@ import {
   type Node,
   type OnConnect,
 } from "@xyflow/react";
-import { invoke } from "@tauri-apps/api/core";
 import { Toolbar } from "./components/Toolbar";
 import { Canvas } from "./components/Canvas";
 import { PreviewPanel } from "./components/PreviewPanel";
@@ -148,9 +147,9 @@ function App() {
     });
     try {
       const effectiveBaseUrl = story.baseUrl || baseUrl;
-      const result = await invoke<StoryResult>("run_story", {
-        storyJson: JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
-      });
+      const result = await window.storywright.runStory(
+        JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
+      );
       setResults((prev) => ({ ...prev, [story.id]: result }));
     } catch (err) {
       const errorMsg = String(err);

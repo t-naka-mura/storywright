@@ -33,3 +33,4 @@ src-tauri/target/
 
 # Storywright - ローカルデータ（Git管理外）
 # .storywright/stories/ と .storywright/config.json はGit管理対象
+dist-electron/

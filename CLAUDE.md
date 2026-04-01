@@ -1,26 +1,27 @@
 # Storywright
 
-Figma / Google Spreadsheet からユーザーストーリーを作成し、E2Eテストを実施できるTauriデスクトップアプリ。
+Figma / Google Spreadsheet からユーザーストーリーを作成し、E2Eテストを実施できるElectronデスクトップアプリ。
 
 ## スタック
 
 - **フロントエンド**: React 19 + TypeScript + Vite
-- **バックエンド**: Tauri 2 (Rust)
+- **バックエンド**: Electron (Node.js)
+- **E2Eテスト**: Playwright（main process で直接実行）
 - **パッケージマネージャ**: pnpm
 
 ## 開発コマンド
 
 ```bash
 pnpm install        # 依存関係インストール
-pnpm tauri dev      # 開発モード起動
-pnpm tauri build    # 本番ビルド
+pnpm dev            # 開発モード起動（Vite + Electron）
+pnpm build          # 本番ビルド
 ```
 
 ## プロジェクト構成
 
 ```
 src/           # React フロントエンド
-src-tauri/     # Tauri (Rust) バックエンド
+electron/      # Electron main process + preload
 docs/ai/       # 設計ドキュメント・仕様・ADR
   adr/         # Architecture Decision Records
   index.md     # docs/ai 運用ガイド
@@ -63,8 +64,7 @@ public/        # 静的アセット
 
 - **ファイルの削除はユーザーの確認なしに行わない**
 - **既存ファイルの全面書き換えはユーザーの確認なしに行わない**（部分的な Edit は可）
-- src-tauri/ 配下の Rust コードの変更は、変更意図を説明してから実行する
-- 設定ファイル（package.json, tsconfig.json, tauri.conf.json 等）の変更は、変更内容を事前に説明する
+- 設定ファイル（package.json, tsconfig.json 等）の変更は、変更内容を事前に説明する
 
 ## Git 運用
 

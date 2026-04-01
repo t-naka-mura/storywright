@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
 
 interface PreviewPanelProps {
   url: string;
@@ -9,19 +8,19 @@ export function PreviewPanel({ url }: PreviewPanelProps) {
   const currentUrlRef = useRef<string>("");
 
   useEffect(() => {
-    invoke("open_preview", { url }).catch((err) => {
+    window.storywright.openPreview(url).catch((err) => {
       console.error("Failed to open preview:", err);
     });
     currentUrlRef.current = url;
 
     return () => {
-      invoke("close_preview").catch(() => {});
+      window.storywright.closePreview().catch(() => {});
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (url !== currentUrlRef.current) {
-      invoke("open_preview", { url }).catch((err) => {
+      window.storywright.openPreview(url).catch((err) => {
         console.error("Failed to update preview:", err);
       });
       currentUrlRef.current = url;

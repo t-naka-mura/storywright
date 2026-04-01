@@ -20,20 +20,19 @@
 ## アーキテクチャ
 
 ```
-[React UI] ←IPC→ [Tauri Rust] ←Sidecar→ [Node.js + Playwright]
-                                              ↓
-                                     [システムブラウザ]
+[React UI] ←IPC→ [Electron main process + Playwright]
+                                    ↓
+                           [システムブラウザ]
 ```
 
 ## 技術スタック
 
 | レイヤー | 技術 | ADR |
 |---------|------|-----|
-| デスクトップ | Tauri 2 | — |
+| デスクトップ | Electron | ADR-009 |
 | フロントエンド | React 19 + TypeScript + Vite | — |
-| バックエンド | Rust (Tauri) | — |
-| E2Eテスト | Playwright（システムブラウザ利用） | ADR-002 |
-| Tauri ↔ Playwright 連携 | Sidecar方式（Node.js同梱） | ADR-003 |
+| バックエンド | Node.js (Electron main process) | ADR-009 |
+| E2Eテスト | Playwright（main process で直接実行） | ADR-002, ADR-009 |
 | データソース | Google Sheets API, Figma MCP/API | ADR-005 |
 
 ## データモデル（ADR-004）

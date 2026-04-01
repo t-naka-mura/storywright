@@ -26,6 +26,19 @@ export type StoryResult = {
   stepResults: StepResult[];
 };
 
+// Electron IPC bridge
+export interface StorywrightAPI {
+  runStory: (storyJson: string) => Promise<StoryResult>;
+  openPreview: (url: string) => Promise<void>;
+  closePreview: () => Promise<void>;
+}
+
+declare global {
+  interface Window {
+    storywright: StorywrightAPI;
+  }
+}
+
 export const ACTION_OPTIONS: { value: Step["action"]; label: string }[] = [
   { value: "navigate", label: "navigate" },
   { value: "click", label: "click" },

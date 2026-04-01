@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, webContents } = require("electron");
+const { app, BrowserWindow, ipcMain, webContents, nativeImage } = require("electron");
 const path = require("path");
 const { chromium } = require("playwright");
 
@@ -7,9 +7,13 @@ let isRecording = false;
 let recordingWebContentsId: number | null = null;
 
 function createMainWindow() {
+  const iconPath = path.join(__dirname, "../public/logo.svg");
+  const icon = nativeImage.createFromPath(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

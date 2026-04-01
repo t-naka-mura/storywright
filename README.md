@@ -1,8 +1,15 @@
+<p align="center">
+  <img src="public/logo.svg" alt="Storywright" width="96" />
+</p>
+
 # Storywright
 
 ユーザーストーリーをキャンバスで設計し、ブラウザ操作の録画から E2E テストを作成・実行できる Electron デスクトップアプリ。
 
 > **Future extension**: Figma / Google Spreadsheet からのストーリーインポートを予定
+
+<!-- スクリーンショットを追加する場合: docs/images/screenshot.png に配置 -->
+<!-- ![Storywright Screenshot](docs/images/screenshot.png) -->
 
 ## スタック
 

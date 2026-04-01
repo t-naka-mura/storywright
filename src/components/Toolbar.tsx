@@ -34,6 +34,7 @@ export function Toolbar({
   return (
     <header className="toolbar">
       <div className="toolbar-left">
+        <img src="/logo.svg" alt="" className="toolbar-logo" />
         <span className="toolbar-title">Storywright</span>
         <div className="toolbar-tabs">
           <button

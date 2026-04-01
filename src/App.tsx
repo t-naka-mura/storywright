@@ -76,7 +76,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [baseUrl, setBaseUrl] = useState("https://example.com");
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
-  const [mainView, setMainView] = useState<MainView>("canvas");
+  const [mainView, setMainView] = useState<MainView>("preview");
   const [isRecording, setIsRecording] = useState(false);
   const [isAssertMode, setIsAssertMode] = useState(false);
   const [recordedStepCount, setRecordedStepCount] = useState(0);
@@ -169,7 +169,6 @@ function App() {
 
   const handleStartRecording = useCallback(async () => {
     if (!selectedStory) return;
-    const url = selectedStory.baseUrl || baseUrl;
     setRecordedStepCount(0);
     setIsRecording(true);
 
@@ -199,7 +198,7 @@ function App() {
     unsubAssertDoneRef.current = unsubAssert;
 
     try {
-      await window.storywright.startRecording(url);
+      await window.storywright.startRecording();
     } catch (err) {
       setIsRecording(false);
       setError({ title: "録画開始エラー", message: String(err) });

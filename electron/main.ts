@@ -1,10 +1,10 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, webContents } = require("electron");
 const path = require("path");
 const { chromium } = require("playwright");
 
 let mainWindow: BrowserWindow | null = null;
-let previewWindow: BrowserWindow | null = null;
 let isRecording = false;
+let recordingWebContentsId: number | null = null;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -14,6 +14,7 @@ function createMainWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
 
@@ -25,7 +26,6 @@ function createMainWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
-    previewWindow?.close();
   });
 }
 
@@ -328,10 +328,13 @@ const RECORDER_INJECTION_SCRIPT = `
 })();
 `;
 
-function setupRecorderOnPreview() {
-  if (!previewWindow || previewWindow.isDestroyed()) return;
+function findWebviewContents(): Electron.WebContents | null {
+  const all = webContents.getAllWebContents();
+  return all.find((wc: Electron.WebContents) => wc.getType() === "webview") ?? null;
+}
 
-  const wc = previewWindow.webContents;
+function setupRecorderOnWebview(wc: Electron.WebContents) {
+  recordingWebContentsId = wc.id;
 
   // CDP 接続してインジェクションスクリプトを自動注入
   try {
@@ -381,72 +384,28 @@ function setupRecorderOnPreview() {
 }
 
 function teardownRecorder() {
-  if (!previewWindow || previewWindow.isDestroyed()) return;
+  if (recordingWebContentsId === null) return;
   try {
-    previewWindow.webContents.debugger.detach();
+    const wc = webContents.fromId(recordingWebContentsId);
+    if (wc && !wc.isDestroyed()) {
+      wc.debugger.detach();
+    }
   } catch {
     // 既にデタッチ済み
   }
+  recordingWebContentsId = null;
 }
 
 // === IPC Handlers ===
 
 function registerIpcHandlers() {
-  ipcMain.handle("open-preview", async (_event, url: string) => {
-    if (previewWindow && !previewWindow.isDestroyed()) {
-      previewWindow.loadURL(url);
-      previewWindow.focus();
-      return;
+  ipcMain.handle("start-recording", async () => {
+    const wc = findWebviewContents();
+    if (!wc) {
+      throw new Error("Preview が見つかりません。Preview タブを開いてください。");
     }
-
-    previewWindow = new BrowserWindow({
-      width: 1024,
-      height: 768,
-      title: "Storywright Preview",
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-      },
-    });
-
-    previewWindow.loadURL(url);
-
-    previewWindow.on("closed", () => {
-      previewWindow = null;
-    });
-  });
-
-  ipcMain.handle("close-preview", async () => {
-    if (previewWindow && !previewWindow.isDestroyed()) {
-      previewWindow.close();
-      previewWindow = null;
-    }
-  });
-
-  ipcMain.handle("start-recording", async (_event, url: string) => {
-    // Preview ウィンドウを開く（または再利用）
-    if (!previewWindow || previewWindow.isDestroyed()) {
-      previewWindow = new BrowserWindow({
-        width: 1024,
-        height: 768,
-        title: "Storywright Preview — Recording",
-        webPreferences: {
-          contextIsolation: true,
-          nodeIntegration: false,
-        },
-      });
-      previewWindow.on("closed", () => {
-        if (isRecording) {
-          isRecording = false;
-          mainWindow?.webContents.send("recorder:stopped");
-        }
-        previewWindow = null;
-      });
-    }
-
-    previewWindow.loadURL(url);
     isRecording = true;
-    setupRecorderOnPreview();
+    setupRecorderOnWebview(wc);
   });
 
   ipcMain.handle("stop-recording", async () => {
@@ -455,9 +414,10 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("toggle-assert-mode", async (_event, enabled: boolean) => {
-    if (!previewWindow || previewWindow.isDestroyed()) return;
-    previewWindow.webContents
-      .executeJavaScript(`window.__storywrightSetAssertMode(${enabled})`)
+    if (recordingWebContentsId === null) return;
+    const wc = webContents.fromId(recordingWebContentsId);
+    if (!wc || wc.isDestroyed()) return;
+    wc.executeJavaScript(`window.__storywrightSetAssertMode(${enabled})`)
       .catch(() => {});
   });
 

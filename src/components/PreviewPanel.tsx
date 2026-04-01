@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-
 interface PreviewPanelProps {
   url: string;
   isRecording: boolean;
@@ -7,53 +5,32 @@ interface PreviewPanelProps {
 }
 
 export function PreviewPanel({ url, isRecording, recordedStepCount }: PreviewPanelProps) {
-  const currentUrlRef = useRef<string>("");
-
-  useEffect(() => {
-    if (!isRecording) {
-      window.storywright.openPreview(url).catch((err) => {
-        console.error("Failed to open preview:", err);
-      });
-      currentUrlRef.current = url;
-    }
-
-    return () => {
-      if (!isRecording) {
-        window.storywright.closePreview().catch(() => {});
-      }
-    };
-  }, [isRecording]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!isRecording && url !== currentUrlRef.current) {
-      window.storywright.openPreview(url).catch((err) => {
-        console.error("Failed to update preview:", err);
-      });
-      currentUrlRef.current = url;
-    }
-  }, [url, isRecording]);
+  const hasUrl = url && /^https?:\/\//.test(url);
 
   return (
     <div className="preview-panel">
-      <div className="preview-placeholder">
-        {isRecording ? (
-          <>
-            <p className="preview-placeholder-recording">
-              ● 録画中... ブラウザで操作してください
-            </p>
-            <p className="preview-placeholder-text">
-              {recordedStepCount} ステップ記録済み
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="preview-placeholder-text">
-              プレビューウィンドウで表示中
-            </p>
-            <p className="preview-placeholder-url">{url}</p>
-          </>
-        )}
-      </div>
+      {isRecording && (
+        <div className="preview-recording-badge">
+          ● 録画中 — {recordedStepCount} ステップ記録済み
+        </div>
+      )}
+      {hasUrl ? (
+        <webview
+          src={url}
+          style={{ width: "100%", height: "100%" }}
+          allowpopups
+        />
+      ) : (
+        <div className="preview-empty">
+          <p className="preview-empty-icon">🌐</p>
+          <p className="preview-empty-text">
+            右上の Base URL にサイトの URL を入力してください
+          </p>
+          <p className="preview-empty-hint">
+            例: https://example.com
+          </p>
+        </div>
+      )}
     </div>
   );
 }

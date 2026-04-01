@@ -37,18 +37,18 @@ export function Toolbar({
         <span className="toolbar-title">Storywright</span>
         <div className="toolbar-tabs">
           <button
-            className={`toolbar-tab ${mainView === "canvas" ? "active" : ""}`}
-            type="button"
-            onClick={() => onMainViewChange("canvas")}
-          >
-            Canvas
-          </button>
-          <button
             className={`toolbar-tab ${mainView === "preview" ? "active" : ""}`}
             type="button"
             onClick={() => onMainViewChange("preview")}
           >
             Preview
+          </button>
+          <button
+            className={`toolbar-tab ${mainView === "canvas" ? "active" : ""}`}
+            type="button"
+            onClick={() => onMainViewChange("canvas")}
+          >
+            Canvas
           </button>
         </div>
         <button className="btn" type="button" onClick={onAddNode}>

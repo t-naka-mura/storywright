@@ -36,9 +36,7 @@ export interface RecordedStep {
 // Electron IPC bridge
 export interface StorywrightAPI {
   runStory: (storyJson: string) => Promise<StoryResult>;
-  openPreview: (url: string) => Promise<void>;
-  closePreview: () => Promise<void>;
-  startRecording: (url: string) => Promise<void>;
+  startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   toggleAssertMode: (enabled: boolean) => Promise<void>;
   onRecorderStep: (callback: (step: RecordedStep) => void) => () => void;
@@ -48,6 +46,20 @@ export interface StorywrightAPI {
 declare global {
   interface Window {
     storywright: StorywrightAPI;
+  }
+}
+
+// Electron <webview> tag for JSX
+declare namespace JSX {
+  interface IntrinsicElements {
+    webview: React.DetailedHTMLProps<
+      React.HTMLAttributes<HTMLElement> & {
+        src?: string;
+        partition?: string;
+        allowpopups?: boolean;
+      },
+      HTMLElement
+    >;
   }
 }
 

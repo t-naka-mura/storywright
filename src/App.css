@@ -353,9 +353,15 @@ body,
   flex: 1;
   background: var(--color-bg);
   display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
-.preview-placeholder {
+.preview-panel webview {
+  flex: 1;
+}
+
+.preview-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -364,22 +370,34 @@ body,
   gap: 8px;
 }
 
-.preview-placeholder-text {
+.preview-empty-icon {
+  font-size: 40px;
+}
+
+.preview-empty-text {
   font-size: 14px;
   color: var(--color-text-secondary);
 }
 
-.preview-placeholder-url {
+.preview-empty-hint {
   font-size: 12px;
   font-family: "SF Mono", "Fira Code", monospace;
-  color: var(--color-accent);
+  color: var(--color-border);
 }
 
-.preview-placeholder-recording {
-  font-size: 16px;
+.preview-recording-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  padding: 4px 12px;
+  background: var(--color-error);
+  color: #ffffff;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--color-error);
+  border-radius: var(--radius-sm);
   animation: recording-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 @keyframes recording-pulse {

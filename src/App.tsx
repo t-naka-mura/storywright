@@ -402,7 +402,7 @@ function App() {
           />
         </div>
         */}
-        <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", flex: 1 }}>
           <PreviewPanel
             url={previewUrl}
             isRecording={isRecording}

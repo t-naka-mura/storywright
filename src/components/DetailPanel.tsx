@@ -42,7 +42,7 @@ export function DetailPanel({
   isRunning,
   repeatProgress,
   repeatResult,
-  mainView,
+  mainView: _mainView,
   standaloneStories,
   onAssignStory,
   onSelectStory,
@@ -297,19 +297,9 @@ export function DetailPanel({
         ) : (
           <div className="panel-empty-area">
             <p className="panel-empty">
-              {mainView === "preview" ? (
-                <>
-                  ● REC を押して録画を開始するか、
-                  <br />
-                  Canvas でストーリーを選択してください
-                </>
-              ) : (
-                <>
-                  エッジ（ストーリー）をクリックすると
-                  <br />
-                  ステップが表示されます
-                </>
-              )}
+              ● REC を押して録画を開始するか、
+              <br />
+              録画済みストーリーを選択してください
             </p>
             {standaloneStories.length > 0 && (
               <div className="standalone-story-list">

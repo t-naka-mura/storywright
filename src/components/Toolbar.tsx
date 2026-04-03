@@ -32,10 +32,7 @@ export function Toolbar({
       <div className="toolbar-left">
         <img src="/logo.svg" alt="" className="toolbar-logo" />
         <span className="toolbar-title">Storywright</span>
-        {/* Canvas タブは ADR-015 により一時非表示 */}
-        <button className="btn" type="button">
-          Import
-        </button>
+        {/* ADR-015: Canvas タブ・Import ボタンは一時非表示 */}
       </div>
       <div className="toolbar-right">
         {/* mainView は常に preview（ADR-015: Canvas 非表示中） */}

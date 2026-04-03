@@ -607,11 +607,17 @@ function registerIpcHandlers() {
       await wc.session.clearCache();
     }
 
+    // CDP を準備
+    try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
+    await wc.debugger.sendCommand("Runtime.enable");
+
     // 最初のステップが navigate ならそこでエンジン注入するのでスキップ
-    // それ以外なら、現在のページに注入
     const firstStep = story.steps[0];
     if (!firstStep || firstStep.action !== "navigate") {
-      await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
+      await wc.debugger.sendCommand("Runtime.evaluate", {
+        expression: EXECUTOR_INJECTION_SCRIPT,
+        returnByValue: true,
+      });
     }
 
     const stepResults: StepResult[] = [];
@@ -645,40 +651,48 @@ function registerIpcHandlers() {
       try {
         if (step.action === "navigate") {
           const url = resolveUrl(step.target, story.baseUrl);
-          // webview の loadURL はリダイレクト時にハングすることがあるため
-          // did-finish-load / did-fail-load で待機する
-          // CDP の Page.navigate + domContentEventFired でナビゲーション
+          // CDP で navigate + Runtime.evaluate でエンジン注入
+          // executeJavaScript はページロード完了を待つため遅い。
+          // Runtime.evaluate ならロード中でもスクリプトを注入できる。
           try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
           await wc.debugger.sendCommand("Page.enable");
-          await new Promise<void>((resolve) => {
-            let resolved = false;
-            const navTimeout = setTimeout(() => {
-              if (!resolved) {
-                resolved = true;
-                wc.debugger.removeListener("message", onMessage);
-                resolve();
+          await wc.debugger.sendCommand("Runtime.enable");
+          wc.debugger.sendCommand("Page.navigate", { url });
+          // JS コンテキストが使えるようになるまでポーリング（CDP経由）
+          for (let attempt = 0; attempt < 50; attempt++) {
+            try {
+              const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
+                expression: "document.readyState",
+                returnByValue: true,
+              }) as { result?: { value?: string } };
+              if (evalResult.result?.value === "interactive" || evalResult.result?.value === "complete") {
+                break;
               }
-            }, 15000);
-
-            const onMessage = (_event: unknown, method: string) => {
-              if (resolved) return;
-              if (method === "Page.domContentEventFired" || method === "Page.loadEventFired") {
-                resolved = true;
-                clearTimeout(navTimeout);
-                wc.debugger.removeListener("message", onMessage);
-                resolve();
-              }
-            };
-
-            wc.debugger.on("message", onMessage);
-            wc.debugger.sendCommand("Page.navigate", { url });
+            } catch { /* context not ready */ }
+            await new Promise((r) => setTimeout(r, 100));
+          }
+          await wc.debugger.sendCommand("Runtime.evaluate", {
+            expression: EXECUTOR_INJECTION_SCRIPT,
+            returnByValue: true,
           });
-          // ロード後に実行エンジンを再注入
-          await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
         } else {
-          const result = await wc.executeJavaScript(
-            `window.__storywrightExecuteStep(${JSON.stringify(step)})`,
-          );
+          // CDP Runtime.evaluate でステップ実行（executeJavaScript はページロード待ちで遅い）
+          try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
+          await wc.debugger.sendCommand("Runtime.enable");
+          // エンジンが注入されていなければ注入
+          await wc.debugger.sendCommand("Runtime.evaluate", {
+            expression: EXECUTOR_INJECTION_SCRIPT,
+            returnByValue: true,
+          });
+          const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
+            expression: `window.__storywrightExecuteStep(${JSON.stringify(step)})`,
+            returnByValue: true,
+            awaitPromise: true,
+          }) as { result?: { value?: { status?: string; error?: string } }; exceptionDetails?: { text?: string } };
+          if (evalResult.exceptionDetails) {
+            throw new Error(evalResult.exceptionDetails.text || "Step execution failed");
+          }
+          const result = evalResult.result?.value;
           if (!result || result.status !== "passed") {
             throw new Error(result?.error || "Step failed");
           }

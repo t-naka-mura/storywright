@@ -1,15 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-
 type MainView = "canvas" | "preview";
 
 interface ToolbarProps {
   onTogglePanel: () => void;
   isPanelOpen: boolean;
   onAddNode: () => void;
-  baseUrl: string;
-  onBaseUrlChange: (url: string) => void;
-  urlHistory: string[];
-  onDeleteUrlHistory: (url: string) => void;
   mainView: MainView;
   onMainViewChange: (view: MainView) => void;
   isRecording: boolean;
@@ -24,10 +18,6 @@ export function Toolbar({
   onTogglePanel,
   isPanelOpen,
   onAddNode,
-  baseUrl,
-  onBaseUrlChange,
-  urlHistory,
-  onDeleteUrlHistory,
   mainView,
   onMainViewChange,
   isRecording,
@@ -37,21 +27,6 @@ export function Toolbar({
   onToggleAssertMode,
   canRecord,
 }: ToolbarProps) {
-  const [showUrlDropdown, setShowUrlDropdown] = useState(false);
-  const urlComboRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showUrlDropdown) return;
-    const handleClick = (e: MouseEvent) => {
-      if (urlComboRef.current && !urlComboRef.current.contains(e.target as Node)) {
-        setShowUrlDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showUrlDropdown]);
-
-  const filteredHistory = urlHistory;
   return (
     <header className="toolbar">
       <div className="toolbar-left">
@@ -81,47 +56,6 @@ export function Toolbar({
         </button>
       </div>
       <div className="toolbar-right">
-        <div className="url-combobox" ref={urlComboRef}>
-          <input
-            className="toolbar-url-input"
-            value={baseUrl}
-            onChange={(e) => {
-              onBaseUrlChange(e.target.value);
-              setShowUrlDropdown(true);
-            }}
-            onFocus={() => setShowUrlDropdown(true)}
-            placeholder="Base URL"
-          />
-          {showUrlDropdown && filteredHistory.length > 0 && (
-            <div className="url-dropdown">
-              {filteredHistory.map((url) => (
-                <div key={url} className="url-dropdown-item">
-                  <button
-                    className="url-dropdown-label"
-                    type="button"
-                    onClick={() => {
-                      onBaseUrlChange(url);
-                      setShowUrlDropdown(false);
-                    }}
-                  >
-                    {url}
-                  </button>
-                  <button
-                    className="url-dropdown-delete"
-                    type="button"
-                    title="履歴から削除"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteUrlHistory(url);
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
         {mainView === "preview" && (
           isRecording ? (
             <>
@@ -147,7 +81,7 @@ export function Toolbar({
               type="button"
               onClick={onStartRecording}
               disabled={!canRecord}
-              title={canRecord ? "録画開始" : "Base URL を入力してください"}
+              title={canRecord ? "録画開始" : "URL を入力してください"}
             >
               ● REC
             </button>

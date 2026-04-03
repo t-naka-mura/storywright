@@ -338,10 +338,6 @@ function App() {
         onTogglePanel={handleTogglePanel}
         isPanelOpen={isPanelOpen}
         onAddNode={handleAddNode}
-        baseUrl={baseUrl}
-        onBaseUrlChange={setBaseUrl}
-        urlHistory={urlHistory}
-        onDeleteUrlHistory={deleteUrlFromHistory}
         mainView={mainView}
         onMainViewChange={setMainView}
         isRecording={isRecording}
@@ -364,7 +360,15 @@ function App() {
             onUpdateEdgeLabel={handleUpdateEdgeLabel}
           />
         ) : (
-          <PreviewPanel url={previewUrl} isRecording={isRecording} recordedStepCount={recordedStepCount} onUrlLoaded={addUrlToHistory} />
+          <PreviewPanel
+            url={previewUrl}
+            isRecording={isRecording}
+            recordedStepCount={recordedStepCount}
+            onUrlChange={setBaseUrl}
+            urlHistory={urlHistory}
+            onDeleteUrlHistory={deleteUrlFromHistory}
+            onUrlLoaded={addUrlToHistory}
+          />
         )}
         <DetailPanel
           isOpen={isPanelOpen}

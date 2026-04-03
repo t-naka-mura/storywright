@@ -1,14 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-// ADR-015: Canvas 一時非表示 — import は復活用に残す
-// import {
-//   addEdge,
-//   useNodesState,
-//   useEdgesState,
-//   type Edge,
-//   type Node,
-//   type OnConnect,
-// } from "@xyflow/react";
-// import { Canvas } from "./components/Canvas";
 import { Toolbar } from "./components/Toolbar";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { DetailPanel } from "./components/DetailPanel";
@@ -18,28 +8,18 @@ import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } f
 import { useUrlHistory } from "./hooks/useUrlHistory";
 import "./App.css";
 
-type MainView = "canvas" | "preview";
-
 const defaultStories: Record<string, Story> = {};
 
-// ADR-015: Canvas 一時非表示 — カウンタは復活用に残す
-// let nodeIdCounter = 0;
-// let edgeIdCounter = 0;
 let storyIdCounter = 0;
 
 function App() {
-  // ADR-015: Canvas 一時非表示 — nodes/edges の state は復活用に残す
-  // const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
-  // const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
   const [stories, setStories] = useState<Record<string, Story>>(defaultStories);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [results, setResults] = useState<Record<string, StoryResult>>({});
   const [isPanelOpen, setIsPanelOpen] = useState(true);
-  const [selectedEdgeId, _setSelectedEdgeId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory } = useUrlHistory();
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
-  const [mainView, setMainView] = useState<MainView>("preview");
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
@@ -55,14 +35,6 @@ function App() {
   // 起動時にファイルからデータを読み込み
   useEffect(() => {
     async function load() {
-      // ADR-015: Canvas 一時非表示 — nodes/edges の読み込みは復活用に残す
-      // const [savedNodes, savedEdges, savedStories] = await Promise.all([
-      //   window.storywright.loadData("nodes.json"),
-      //   window.storywright.loadData("edges.json"),
-      //   window.storywright.loadData("stories.json"),
-      // ]);
-      // if (savedNodes) setNodes(savedNodes as Node[]);
-      // if (savedEdges) setEdges(savedEdges as Edge[]);
       const savedStories = await window.storywright.loadData("stories.json");
       if (savedStories) setStories(savedStories as Record<string, Story>);
       setDataLoaded(true);
@@ -71,80 +43,13 @@ function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ファイルへの永続化（データ読み込み完了後のみ）
-  // ADR-015: Canvas 一時非表示 — nodes/edges の永続化は復活用に残す
-  // useEffect(() => {
-  //   if (!dataLoaded) return;
-  //   window.storywright.saveData("nodes.json", nodes);
-  // }, [nodes, dataLoaded]);
-  // useEffect(() => {
-  //   if (!dataLoaded) return;
-  //   window.storywright.saveData("edges.json", edges);
-  // }, [edges, dataLoaded]);
   useEffect(() => {
     if (!dataLoaded) return;
     window.storywright.saveData("stories.json", stories);
   }, [stories, dataLoaded]);
 
-  // selectedStoryId を優先し、フォールバックで selectedEdgeId を使う
-  const activeStoryId = selectedStoryId ?? selectedEdgeId;
-  const selectedStory = activeStoryId ? stories[activeStoryId] ?? null : null;
-  const selectedResult = activeStoryId ? results[activeStoryId] ?? null : null;
-
-  /* ADR-015: Canvas 一時非表示 — ハンドラは復活用に残す
-  const handleAddNode = useCallback(() => {
-    const id = `screen-${++nodeIdCounter}`;
-    const newNode: Node = {
-      id,
-      type: "screen",
-      position: { x: 200 + Math.random() * 100, y: 150 + Math.random() * 100 },
-      data: { label: "新しい画面", url: "/new" },
-    };
-    setNodes((nds) => [...nds, newNode]);
-  }, [setNodes]);
-
-  const handleUpdateNode = useCallback(
-    (nodeId: string, data: { label: string; url: string }) => {
-      setNodes((nds) =>
-        nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n)),
-      );
-    },
-    [setNodes],
-  );
-
-  const handleConnect: OnConnect = useCallback(
-    (connection) => {
-      const id = `edge-${++edgeIdCounter}`;
-      const title = "新しいストーリー";
-      setEdges((eds) => addEdge({ ...connection, id, label: title }, eds));
-      setStories((prev) => ({
-        ...prev,
-        [id]: { id, title, steps: [] },
-      }));
-    },
-    [setEdges],
-  );
-
-  const handleUpdateEdgeLabel = useCallback(
-    (edgeId: string, label: string) => {
-      setEdges((eds) => eds.map((e) => (e.id === edgeId ? { ...e, label } : e)));
-      setStories((prev) => {
-        const story = prev[edgeId];
-        if (!story) return prev;
-        return { ...prev, [edgeId]: { ...story, title: label } };
-      });
-    },
-    [setEdges],
-  );
-
-  const handleEdgeClick = useCallback(
-    (_edge: Edge) => {
-      setSelectedEdgeId(_edge.id);
-      setSelectedStoryId(null);
-      if (!isPanelOpen) setIsPanelOpen(true);
-    },
-    [isPanelOpen],
-  );
-  */
+  const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
+  const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;
 
   const handleUpdateStory = useCallback((story: Story) => {
     setStories((prev) => ({ ...prev, [story.id]: story }));
@@ -153,7 +58,6 @@ function App() {
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
     runCancelledRef.current = false;
     setIsRunning(true);
-    setMainView("preview");
     const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setResults((prev) => {
@@ -206,7 +110,6 @@ function App() {
 
   const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number, keepSession: boolean) => {
     setIsRunning(true);
-    setMainView("preview");
     const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setRepeatProgress({ current: 0, total: repeatCount });
@@ -260,7 +163,7 @@ function App() {
 
   const handleStartRecording = useCallback(async () => {
     // Story が未選択ならスタンドアロン Story を自動生成
-    let targetStoryId = activeStoryId;
+    let targetStoryId = selectedStoryId;
     if (!targetStoryId) {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
@@ -306,7 +209,7 @@ function App() {
       setIsRecording(false);
       setError({ title: "録画開始エラー", message: String(err) });
     }
-  }, [activeStoryId, isPanelOpen]);
+  }, [selectedStoryId, isPanelOpen]);
 
   const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
@@ -341,25 +244,9 @@ function App() {
     };
   }, []);
 
-  // ADR-015: Canvas 非表示により全 Story がスタンドアロン
   const standaloneStories = Object.values(stories).filter(
     (s) => s.steps.length > 0,
   );
-
-  /* ADR-015: Canvas 一時非表示 — handleAssignStory は復活用に残す
-  const handleAssignStory = useCallback((standaloneStoryId: string) => {
-    if (!activeStoryId) return;
-    setStories((prev) => {
-      const source = prev[standaloneStoryId];
-      const target = prev[activeStoryId];
-      if (!source || !target) return prev;
-      const next = { ...prev };
-      next[activeStoryId] = { ...target, steps: [...source.steps] };
-      delete next[standaloneStoryId];
-      return next;
-    });
-  }, [activeStoryId]);
-  */
 
   const handleTogglePanel = useCallback(() => {
     setIsPanelOpen((prev) => !prev);
@@ -377,9 +264,6 @@ function App() {
       <Toolbar
         onTogglePanel={handleTogglePanel}
         isPanelOpen={isPanelOpen}
-        onAddNode={() => {}}
-        mainView={mainView}
-        onMainViewChange={setMainView}
         isRecording={isRecording}
         isAssertMode={isAssertMode}
         onStartRecording={handleStartRecording}
@@ -388,20 +272,6 @@ function App() {
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
       />
       <div className="main-area">
-        {/* ADR-015: Canvas は一時非表示。コア機能安定後に廃止 or 再設計
-        <div style={{ display: mainView === "canvas" ? "flex" : "none", flex: 1 }}>
-          <Canvas
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={handleConnect}
-            onEdgeClick={handleEdgeClick}
-            onUpdateNode={handleUpdateNode}
-            onUpdateEdgeLabel={handleUpdateEdgeLabel}
-          />
-        </div>
-        */}
         <div style={{ display: "flex", flex: 1 }}>
           <PreviewPanel
             url={previewUrl}
@@ -427,13 +297,11 @@ function App() {
           isRunning={isRunning}
           repeatProgress={repeatProgress}
           repeatResult={repeatResult}
-          mainView={mainView}
           standaloneStories={standaloneStories}
-          onAssignStory={() => {}}
           onSelectStory={setSelectedStoryId}
         />
       </div>
-      <StatusBar nodeCount={0} edgeCount={0} isRecording={isRecording} isAssertMode={isAssertMode} />
+      <StatusBar isRecording={isRecording} isAssertMode={isAssertMode} />
       {error && (
         <ErrorDialog
           title={error.title}

@@ -1,11 +1,6 @@
-type MainView = "canvas" | "preview";
-
 interface ToolbarProps {
   onTogglePanel: () => void;
   isPanelOpen: boolean;
-  onAddNode: () => void;
-  mainView: MainView;
-  onMainViewChange: (view: MainView) => void;
   isRecording: boolean;
   isAssertMode: boolean;
   onStartRecording: () => void;
@@ -17,9 +12,6 @@ interface ToolbarProps {
 export function Toolbar({
   onTogglePanel,
   isPanelOpen,
-  onAddNode: _onAddNode,
-  mainView: _mainView,
-  onMainViewChange: _onMainViewChange,
   isRecording,
   isAssertMode,
   onStartRecording,
@@ -35,7 +27,6 @@ export function Toolbar({
         {/* ADR-015: Canvas タブ・Import ボタンは一時非表示 */}
       </div>
       <div className="toolbar-right">
-        {/* mainView は常に preview（ADR-015: Canvas 非表示中） */}
         {isRecording ? (
             <>
               <button
@@ -68,9 +59,6 @@ export function Toolbar({
         }
         <button className="btn" type="button" onClick={onTogglePanel}>
           {isPanelOpen ? "▷" : "◁"} Panel
-        </button>
-        <button className="btn btn-primary" type="button">
-          ▶ Run All
         </button>
       </div>
     </header>

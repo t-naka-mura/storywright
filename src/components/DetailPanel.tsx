@@ -15,9 +15,7 @@ interface DetailPanelProps {
   isRunning: boolean;
   repeatProgress: { current: number; total: number } | null;
   repeatResult: RepeatResult | null;
-  mainView: "canvas" | "preview";
   standaloneStories: Story[];
-  onAssignStory?: (standaloneStoryId: string) => void;
   onSelectStory?: (storyId: string) => void;
 }
 
@@ -42,9 +40,7 @@ export function DetailPanel({
   isRunning,
   repeatProgress,
   repeatResult,
-  mainView: _mainView,
   standaloneStories,
-  onAssignStory,
   onSelectStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -194,25 +190,6 @@ export function DetailPanel({
                 placeholder="https://..."
               />
             </div>
-            {standaloneStories.length > 0 && story.steps.length === 0 && onAssignStory && (
-              <div className="panel-field">
-                <label className="panel-field-label">録画済みストーリーを割り当て</label>
-                <select
-                  className="panel-field-input"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) onAssignStory(e.target.value);
-                  }}
-                >
-                  <option value="">選択してください...</option>
-                  {standaloneStories.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}（{s.steps.length} ステップ）
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
             <ol className="step-list">
               {story.steps.map((step, index) => {
                 const result = storyResult?.stepResults.find(

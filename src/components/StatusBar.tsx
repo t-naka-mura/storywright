@@ -1,11 +1,9 @@
 interface StatusBarProps {
-  nodeCount: number;
-  edgeCount: number;
   isRecording: boolean;
   isAssertMode: boolean;
 }
 
-export function StatusBar({ nodeCount, edgeCount, isRecording, isAssertMode }: StatusBarProps) {
+export function StatusBar({ isRecording, isAssertMode }: StatusBarProps) {
   return (
     <footer className="status-bar">
       <div className="status-item">
@@ -26,8 +24,6 @@ export function StatusBar({ nodeCount, edgeCount, isRecording, isAssertMode }: S
           </>
         )}
       </div>
-      <div className="status-item">画面: {nodeCount}</div>
-      <div className="status-item">ストーリー: {edgeCount}</div>
     </footer>
   );
 }

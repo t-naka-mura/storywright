@@ -583,6 +583,40 @@ function registerIpcHandlers() {
     });
   }
 
+  // DOM 安定待機: MutationObserver で変更を監視し、
+  // quietMs の間変更がなければ「安定した」と判断する
+  function waitForDomSettle(timeoutMs, quietMs) {
+    timeoutMs = timeoutMs || 3000;
+    quietMs = quietMs || 150;
+    return new Promise(function(resolve) {
+      var timer = null;
+      var observer = new MutationObserver(function() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function() {
+          observer.disconnect();
+          resolve();
+        }, quietMs);
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        characterData: true
+      });
+      // 初回タイマー: DOM 変更が一切なくても quietMs 後に解決
+      timer = setTimeout(function() {
+        observer.disconnect();
+        resolve();
+      }, quietMs);
+      // 最大待機ガード
+      setTimeout(function() {
+        if (timer) clearTimeout(timer);
+        observer.disconnect();
+        resolve();
+      }, timeoutMs);
+    });
+  }
+
   window.__storywrightExecuteStep = async function(step) {
     var timeout = 10000;
 
@@ -591,6 +625,7 @@ function registerIpcHandlers() {
         var el = await waitForElement(step.target, timeout);
         el.scrollIntoView({ block: 'center' });
         el.click();
+        await waitForDomSettle();
         return { status: 'passed' };
       }
       case 'type': {
@@ -610,6 +645,7 @@ function registerIpcHandlers() {
         }
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitForDomSettle();
         return { status: 'passed' };
       }
       case 'select': {
@@ -617,6 +653,7 @@ function registerIpcHandlers() {
         sel.scrollIntoView({ block: 'center' });
         sel.value = step.value;
         sel.dispatchEvent(new Event('change', { bubbles: true }));
+        await waitForDomSettle();
         return { status: 'passed' };
       }
       case 'assert': {
@@ -653,7 +690,7 @@ function registerIpcHandlers() {
 })();
 `;
 
-  const SLOW_MO = 300; // ステップ間の待機時間(ms) — 操作の様子を見やすくする
+  const SLOW_MO = 50; // ステップ間の最小待機(ms) — DOM安定待機は webview 側で実施
   let currentRunId = 0;
 
   async function runStoryOnWebview(story: StoryInput, keepSession: boolean, runId: number): Promise<{

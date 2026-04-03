@@ -6,9 +6,14 @@ const MAX_HISTORY = 20;
 const DEFAULT_URL = "https://example.com";
 
 export function useUrlHistory() {
-  const [baseUrl, setBaseUrl] = useState(() => {
+  const [baseUrl, setBaseUrlState] = useState(() => {
     return localStorage.getItem(STORAGE_KEY_LAST) || DEFAULT_URL;
   });
+
+  const setBaseUrl = useCallback((url: string) => {
+    setBaseUrlState(url);
+    if (url) localStorage.setItem(STORAGE_KEY_LAST, url);
+  }, []);
 
   const [urlHistory, setUrlHistory] = useState<string[]>(() => {
     try {

@@ -1,5 +1,29 @@
 const { app, BrowserWindow, ipcMain, webContents, nativeImage } = require("electron");
 const path = require("path");
+const fs = require("fs");
+
+// === データ永続化 ===
+
+function getDataDir(): string {
+  const dir = path.join(app.getPath("userData"), "data");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function saveData(filename: string, data: unknown): void {
+  const filePath = path.join(getDataDir(), filename);
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+}
+
+function loadData<T>(filename: string, fallback: T): T {
+  const filePath = path.join(getDataDir(), filename);
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return fallback;
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let isRecording = false;
@@ -237,29 +261,59 @@ const RECORDER_INJECTION_SCRIPT = `
     });
   }, false);
 
-  // type capture (debounced per element)
+  // type capture (debounced per element + blur fallback)
   var inputTimers = new WeakMap();
+  var inputSent = new WeakMap(); // 最後に送信した値を記録
+
+  function sendTypeStep(target) {
+    var value = target.value || target.textContent || '';
+    // 同じ値を重複送信しない
+    if (inputSent.get(target) === value) return;
+    inputSent.set(target, value);
+    sendStep({
+      action: 'type',
+      target: generateSelector(target),
+      value: value,
+      timestamp: Date.now()
+    });
+  }
+
+  function isInputElement(el) {
+    if (!el || !el.tagName) return false;
+    var tag = el.tagName.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || el.isContentEditable;
+  }
+
   function handleInput(e) {
     if (window.__storywrightAssertMode) return;
     var target = e.target;
-    if (!target || !target.tagName) return;
-    var itag = target.tagName.toLowerCase();
-    if (itag !== 'input' && itag !== 'textarea' && !target.isContentEditable) return;
+    if (!isInputElement(target)) return;
 
     if (inputTimers.has(target)) clearTimeout(inputTimers.get(target));
     inputTimers.set(target, setTimeout(function() {
-      sendStep({
-        action: 'type',
-        target: generateSelector(target),
-        value: target.value || target.textContent || '',
-        timestamp: Date.now()
-      });
+      sendTypeStep(target);
       inputTimers.delete(target);
     }, 500));
   }
   document.addEventListener('input', handleInput, true);
 
-  // select capture
+  // blur / change でフォールバック: デバウンスが発火する前にフォーカスが外れた場合に確実にキャプチャ
+  function handleBlurOrChange(e) {
+    if (window.__storywrightAssertMode) return;
+    var target = e.target;
+    if (!isInputElement(target)) return;
+    // 保留中のデバウンスをキャンセルして即送信
+    if (inputTimers.has(target)) {
+      clearTimeout(inputTimers.get(target));
+      inputTimers.delete(target);
+    }
+    var value = target.value || target.textContent || '';
+    if (value) sendTypeStep(target);
+  }
+  document.addEventListener('blur', handleBlurOrChange, true);
+  document.addEventListener('change', handleBlurOrChange, true);
+
+  // select capture (change イベントのうち SELECT 要素のみ)
   document.addEventListener('change', function(e) {
     if (window.__storywrightAssertMode) return;
     var target = e.target;
@@ -270,7 +324,7 @@ const RECORDER_INJECTION_SCRIPT = `
       value: target.value,
       timestamp: Date.now()
     });
-  }, true);
+  }, false);
 })();
 `;
 
@@ -351,6 +405,15 @@ function teardownRecorder() {
 // === IPC Handlers ===
 
 function registerIpcHandlers() {
+  // データ永続化
+  ipcMain.handle("save-data", async (_event, filename: string, data: unknown) => {
+    saveData(filename, data);
+  });
+
+  ipcMain.handle("load-data", async (_event, filename: string) => {
+    return loadData(filename, null);
+  });
+
   ipcMain.handle("start-recording", async () => {
     const wc = findWebviewContents();
     if (!wc) {

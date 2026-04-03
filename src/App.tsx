@@ -19,59 +19,19 @@ import "./App.css";
 
 type MainView = "canvas" | "preview";
 
-const initialNodes: Node[] = [
-  {
-    id: "login",
-    type: "screen",
-    position: { x: 80, y: 80 },
-    data: { label: "ログイン画面", url: "/login" },
-  },
-  {
-    id: "dashboard",
-    type: "screen",
-    position: { x: 400, y: 40 },
-    data: { label: "ダッシュボード", url: "/dashboard" },
-  },
-  {
-    id: "signup",
-    type: "screen",
-    position: { x: 400, y: 200 },
-    data: { label: "新規登録画面", url: "/signup" },
-  },
-];
-
-const initialEdges: Edge[] = [
-  { id: "login-flow", source: "login", target: "dashboard", label: "ログイン" },
-  { id: "signup-flow", source: "login", target: "signup", label: "新規登録" },
-];
-
-const initialStories: Record<string, Story> = {
-  "login-flow": {
-    id: "login-flow",
-    title: "ログイン",
-    steps: [
-      { order: 1, action: "navigate", target: "/login", value: "", description: "" },
-      { order: 2, action: "type", target: "#email", value: "test@example.com", description: "" },
-      { order: 3, action: "type", target: "#password", value: "password", description: "" },
-      { order: 4, action: "click", target: "button[type=submit]", value: "", description: "" },
-      { order: 5, action: "assert", target: "h1", value: "Dashboard", description: "" },
-    ],
-  },
-  "signup-flow": {
-    id: "signup-flow",
-    title: "新規登録",
-    steps: [],
-  },
-};
+const defaultNodes: Node[] = [];
+const defaultEdges: Edge[] = [];
+const defaultStories: Record<string, Story> = {};
 
 let nodeIdCounter = 0;
 let edgeIdCounter = 0;
 let storyIdCounter = 0;
 
 function App() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [stories, setStories] = useState<Record<string, Story>>(initialStories);
+  const [nodes, setNodes, onNodesChange] = useNodesState(defaultNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
+  const [stories, setStories] = useState<Record<string, Story>>(defaultStories);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [results, setResults] = useState<Record<string, StoryResult>>({});
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -89,6 +49,36 @@ function App() {
   const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+
+  // 起動時にファイルからデータを読み込み
+  useEffect(() => {
+    async function load() {
+      const [savedNodes, savedEdges, savedStories] = await Promise.all([
+        window.storywright.loadData("nodes.json"),
+        window.storywright.loadData("edges.json"),
+        window.storywright.loadData("stories.json"),
+      ]);
+      if (savedNodes) setNodes(savedNodes as Node[]);
+      if (savedEdges) setEdges(savedEdges as Edge[]);
+      if (savedStories) setStories(savedStories as Record<string, Story>);
+      setDataLoaded(true);
+    }
+    load();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ファイルへの永続化（データ読み込み完了後のみ）
+  useEffect(() => {
+    if (!dataLoaded) return;
+    window.storywright.saveData("nodes.json", nodes);
+  }, [nodes, dataLoaded]);
+  useEffect(() => {
+    if (!dataLoaded) return;
+    window.storywright.saveData("edges.json", edges);
+  }, [edges, dataLoaded]);
+  useEffect(() => {
+    if (!dataLoaded) return;
+    window.storywright.saveData("stories.json", stories);
+  }, [stories, dataLoaded]);
 
   // selectedStoryId を優先し、フォールバックで selectedEdgeId を使う
   const activeStoryId = selectedStoryId ?? selectedEdgeId;
@@ -254,7 +244,7 @@ function App() {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const id = `story-${++storyIdCounter}`;
-      const newStory: Story = { id, title: `録画 ${timestamp}`, baseUrl, steps: [] };
+      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [] };
       setStories((prev) => ({ ...prev, [id]: newStory }));
       setSelectedStoryId(id);
       targetStoryId = id;
@@ -357,7 +347,8 @@ function App() {
     setIsPanelOpen(false);
   }, []);
 
-  const previewUrl = selectedStory?.baseUrl || baseUrl;
+  // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
+  const previewUrl = isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
   return (
     <div className="app-layout">
@@ -375,7 +366,7 @@ function App() {
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
       />
       <div className="main-area">
-        {mainView === "canvas" ? (
+        <div style={{ display: mainView === "canvas" ? "flex" : "none", flex: 1 }}>
           <Canvas
             nodes={nodes}
             edges={edges}
@@ -386,7 +377,8 @@ function App() {
             onUpdateNode={handleUpdateNode}
             onUpdateEdgeLabel={handleUpdateEdgeLabel}
           />
-        ) : (
+        </div>
+        <div style={{ display: mainView === "preview" ? "flex" : "none", flex: 1 }}>
           <PreviewPanel
             url={previewUrl}
             isRecording={isRecording}
@@ -397,7 +389,7 @@ function App() {
             onDeleteUrlHistory={deleteUrlFromHistory}
             onUrlLoaded={addUrlToHistory}
           />
-        )}
+        </div>
         <DetailPanel
           isOpen={isPanelOpen}
           onClose={handleClosePanel}

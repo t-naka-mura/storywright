@@ -58,6 +58,8 @@ export type StepProgress = {
 
 // Electron IPC bridge
 export interface StorywrightAPI {
+  saveData: (filename: string, data: unknown) => Promise<void>;
+  loadData: (filename: string) => Promise<unknown>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRepeat: () => Promise<void>;

@@ -1,7 +1,7 @@
 # ADR-003: Tauri と Playwright の連携アーキテクチャ
 
 - 日付: 2026-03-31
-- ステータス: 承認
+- ステータス: 廃止（ADR-009 で Electron に移行）
 
 ## Context (背景)
 

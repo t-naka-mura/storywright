@@ -7,7 +7,8 @@ AI設計・仕様・ADR（設計判断記録）を体系的に管理し、プロ
 
 - docs/ai/index.md …… この運用ガイド・テンプレート例
 - docs/ai/product-overview.md …… プロダクト概要
-- docs/ai/adr/ …… ADR（Architecture Decision Record）を格納
+- docs/ai/adr/ …… ADR（現行の設計判断。作業中・今後影響するもの）
+- docs/ai/adr/archive/ …… 確定済み・安定したADR（必要なときだけ参照）
 - docs/ai/（その他仕様書や設計資料）
 
 ## 運用ルール

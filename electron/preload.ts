@@ -1,9 +1,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("storywright", {
-  runStory: (storyJson: string) => ipcRenderer.invoke("run-story", storyJson),
-  runStoryRepeat: (storyJson: string, repeatCount: number) =>
-    ipcRenderer.invoke("run-story-repeat", storyJson, repeatCount),
+  runStory: (storyJson: string, keepSession?: boolean) =>
+    ipcRenderer.invoke("run-story", storyJson, keepSession),
+  runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) =>
+    ipcRenderer.invoke("run-story-repeat", storyJson, repeatCount, keepSession),
   cancelRepeat: () => ipcRenderer.invoke("cancel-repeat"),
   startRecording: () => ipcRenderer.invoke("start-recording"),
   stopRecording: () => ipcRenderer.invoke("stop-recording"),
@@ -27,6 +28,13 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.on("repeat:progress", listener);
     return () => {
       ipcRenderer.removeListener("repeat:progress", listener);
+    };
+  },
+  onStepProgress: (callback: (progress: unknown) => void) => {
+    const listener = (_event: unknown, progress: unknown) => callback(progress);
+    ipcRenderer.on("step:progress", listener);
+    return () => {
+      ipcRenderer.removeListener("step:progress", listener);
     };
   },
 });

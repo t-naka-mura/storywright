@@ -841,6 +841,20 @@ li:hover + li .step-insert-zone .btn-insert {
   border-top: 1px solid var(--color-border);
 }
 
+.panel-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.panel-checkbox input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
 /* Split button */
 .split-button {
   position: relative;

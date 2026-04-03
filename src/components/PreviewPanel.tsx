@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 interface PreviewPanelProps {
   url: string;
   isRecording: boolean;
+  isRunning: boolean;
   recordedStepCount: number;
   onUrlChange: (url: string) => void;
   urlHistory: string[];
@@ -13,6 +14,7 @@ interface PreviewPanelProps {
 export function PreviewPanel({
   url,
   isRecording,
+  isRunning,
   recordedStepCount,
   onUrlChange,
   urlHistory,
@@ -141,7 +143,7 @@ export function PreviewPanel({
           className="browser-bar-btn"
           type="button"
           onClick={handleGoBack}
-          disabled={!canGoBack}
+          disabled={!canGoBack || isRunning}
           title="戻る"
         >
           ←
@@ -150,7 +152,7 @@ export function PreviewPanel({
           className="browser-bar-btn"
           type="button"
           onClick={handleGoForward}
-          disabled={!canGoForward}
+          disabled={!canGoForward || isRunning}
           title="進む"
         >
           →
@@ -159,7 +161,7 @@ export function PreviewPanel({
           className="browser-bar-btn"
           type="button"
           onClick={handleReload}
-          disabled={!hasUrl}
+          disabled={!hasUrl || isRunning}
           title="再読み込み"
         >
           ↻
@@ -168,6 +170,7 @@ export function PreviewPanel({
           <input
             className="browser-bar-url-input"
             value={barUrl}
+            disabled={isRunning}
             onChange={(e) => {
               setBarUrl(e.target.value);
               setIsEditing(true);

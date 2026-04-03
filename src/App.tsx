@@ -153,8 +153,9 @@ function App() {
     setStories((prev) => ({ ...prev, [story.id]: story }));
   }, []);
 
-  const handleRunStory = useCallback(async (story: Story) => {
+  const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
     setIsRunning(true);
+    setMainView("preview");
     const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setResults((prev) => {
@@ -162,9 +163,32 @@ function App() {
       delete next[story.id];
       return next;
     });
+
+    // ステップ進捗リスナー
+    const unsubStep = window.storywright.onStepProgress((progress) => {
+      setResults((prev) => {
+        const existing = prev[progress.storyId];
+        const stepResult = {
+          order: progress.order,
+          status: progress.status === "running" ? ("passed" as const) : progress.status,
+          durationMs: progress.durationMs,
+          error: progress.error,
+        };
+        if (!existing) {
+          return { ...prev, [progress.storyId]: { storyId: progress.storyId, status: "passed", stepResults: [stepResult] } };
+        }
+        const stepResults = existing.stepResults.filter((r) => r.order !== progress.order);
+        if (progress.status !== "running") {
+          stepResults.push(stepResult);
+        }
+        return { ...prev, [progress.storyId]: { ...existing, stepResults } };
+      });
+    });
+
     try {
       const result = await window.storywright.runStory(
         JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
+        keepSession,
       );
       setResults((prev) => ({ ...prev, [story.id]: result }));
     } catch (err) {
@@ -175,11 +199,13 @@ function App() {
       });
     } finally {
       setIsRunning(false);
+      unsubStep();
     }
   }, [baseUrl, addUrlToHistory]);
 
-  const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number) => {
+  const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number, keepSession: boolean) => {
     setIsRunning(true);
+    setMainView("preview");
     const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setRepeatProgress({ current: 0, total: repeatCount });
@@ -200,6 +226,7 @@ function App() {
       const result = await window.storywright.runStoryRepeat(
         JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
         repeatCount,
+        keepSession,
       );
       setRepeatResult(result);
     } catch (err) {
@@ -227,7 +254,7 @@ function App() {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const id = `story-${++storyIdCounter}`;
-      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [] };
+      const newStory: Story = { id, title: `録画 ${timestamp}`, baseUrl, steps: [] };
       setStories((prev) => ({ ...prev, [id]: newStory }));
       setSelectedStoryId(id);
       targetStoryId = id;
@@ -345,7 +372,7 @@ function App() {
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onToggleAssertMode={handleToggleAssertMode}
-        canRecord={/^https?:\/\//.test(previewUrl)}
+        canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
       />
       <div className="main-area">
         {mainView === "canvas" ? (
@@ -363,6 +390,7 @@ function App() {
           <PreviewPanel
             url={previewUrl}
             isRecording={isRecording}
+            isRunning={isRunning}
             recordedStepCount={recordedStepCount}
             onUrlChange={setBaseUrl}
             urlHistory={urlHistory}

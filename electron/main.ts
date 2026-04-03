@@ -1,6 +1,5 @@
 const { app, BrowserWindow, ipcMain, webContents, nativeImage } = require("electron");
 const path = require("path");
-const { chromium } = require("playwright");
 
 let mainWindow: BrowserWindow | null = null;
 let isRecording = false;
@@ -64,65 +63,6 @@ interface StepResult {
   error?: string;
 }
 
-async function executeStep(
-  page: Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launch>>["newPage"]>>,
-  step: Step,
-  baseUrl?: string,
-): Promise<StepResult> {
-  const start = Date.now();
-  try {
-    switch (step.action) {
-      case "navigate":
-        await page.goto(resolveUrl(step.target, baseUrl), {
-          waitUntil: "domcontentloaded",
-        });
-        break;
-      case "click":
-        await page.locator(step.target).click({ timeout: 10000 });
-        break;
-      case "type":
-        await page.locator(step.target).fill(step.value, { timeout: 10000 });
-        break;
-      case "select":
-        await page.locator(step.target).selectOption(step.value, {
-          timeout: 10000,
-        });
-        break;
-      case "assert": {
-        const el = page.locator(step.target);
-        await el.waitFor({ timeout: 10000 });
-        const text = await el.textContent();
-        if (!text?.includes(step.value)) {
-          throw new Error(
-            `Assertion failed: expected "${step.value}" in "${text}"`,
-          );
-        }
-        break;
-      }
-      case "wait":
-        if (step.value === "hidden") {
-          await page.locator(step.target).waitFor({
-            state: "hidden",
-            timeout: 10000,
-          });
-        } else {
-          await page.locator(step.target).waitFor({
-            state: "visible",
-            timeout: 10000,
-          });
-        }
-        break;
-      case "screenshot":
-        break;
-      default:
-        throw new Error(`Unknown action: ${step.action}`);
-    }
-    return { order: step.order, status: "passed", durationMs: Date.now() - start };
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return { order: step.order, status: "failed", durationMs: Date.now() - start, error: message };
-  }
-}
 
 // === Recorder ===
 
@@ -433,20 +373,185 @@ function registerIpcHandlers() {
       .catch(() => {});
   });
 
-  // ストーリーを1回実行する共通ロジック
-  async function runStoryOnce(story: StoryInput): Promise<{
+  // === Webview 上でのステップ実行 ===
+
+  /**
+   * セレクタ解決 + アクション実行スクリプト。
+   * レコーダーが生成する全パターンをカバーする。
+   */
+  const EXECUTOR_INJECTION_SCRIPT = `
+(function() {
+  if (window.__storywrightExecutor) return;
+  window.__storywrightExecutor = true;
+
+  function resolveSelector(selector) {
+    // text="..." — テキスト内容で検索
+    var textMatch = selector.match(/^text="(.+)"$/);
+    if (textMatch) {
+      var text = textMatch[1];
+      var candidates = document.querySelectorAll('button, a, [role="button"], [role="link"]');
+      for (var i = 0; i < candidates.length; i++) {
+        if (candidates[i].textContent && candidates[i].textContent.trim() === text) {
+          return candidates[i];
+        }
+      }
+      // フォールバック: 全要素から検索
+      var all = document.querySelectorAll('*');
+      for (var j = 0; j < all.length; j++) {
+        if (all[j].childElementCount === 0 && all[j].textContent && all[j].textContent.trim() === text) {
+          return all[j];
+        }
+      }
+      return null;
+    }
+
+    // role=...[name="..."] — ARIA ロール + 名前で検索
+    var roleMatch = selector.match(/^role=([\\w]+)\\[name="(.+)"\\]$/);
+    if (roleMatch) {
+      var role = roleMatch[1];
+      var name = roleMatch[2];
+      var roleEls = document.querySelectorAll('[role="' + role + '"], ' + role);
+      for (var k = 0; k < roleEls.length; k++) {
+        var ariaLabel = roleEls[k].getAttribute('aria-label') || roleEls[k].textContent?.trim();
+        if (ariaLabel === name) return roleEls[k];
+      }
+      return null;
+    }
+
+    // label:has-text("...") >> tag — ラベルテキストから子要素を検索
+    var labelMatch = selector.match(/^label:has-text\\("(.+)"\\) >> (\\w+)$/);
+    if (labelMatch) {
+      var labelText = labelMatch[1];
+      var childTag = labelMatch[2];
+      var labels = document.querySelectorAll('label');
+      for (var l = 0; l < labels.length; l++) {
+        if (labels[l].textContent && labels[l].textContent.includes(labelText)) {
+          // label 内の子要素
+          var child = labels[l].querySelector(childTag);
+          if (child) return child;
+          // label[for] で関連付けられた要素
+          var forId = labels[l].getAttribute('for');
+          if (forId) {
+            var target = document.getElementById(forId);
+            if (target && target.tagName.toLowerCase() === childTag) return target;
+          }
+        }
+      }
+      return null;
+    }
+
+    // CSS セレクタ（#id, [data-testid="..."], [placeholder="..."], etc.）
+    try {
+      return document.querySelector(selector);
+    } catch(e) {
+      return null;
+    }
+  }
+
+  function waitForElement(selector, timeoutMs) {
+    return new Promise(function(resolve, reject) {
+      var el = resolveSelector(selector);
+      if (el) { resolve(el); return; }
+      var elapsed = 0;
+      var interval = setInterval(function() {
+        elapsed += 100;
+        el = resolveSelector(selector);
+        if (el) { clearInterval(interval); resolve(el); return; }
+        if (elapsed >= timeoutMs) { clearInterval(interval); reject(new Error('Element not found: ' + selector)); }
+      }, 100);
+    });
+  }
+
+  window.__storywrightExecuteStep = async function(step) {
+    var timeout = 10000;
+
+    switch (step.action) {
+      case 'click': {
+        var el = await waitForElement(step.target, timeout);
+        el.scrollIntoView({ block: 'center' });
+        el.click();
+        return { status: 'passed' };
+      }
+      case 'type': {
+        var input = await waitForElement(step.target, timeout);
+        input.scrollIntoView({ block: 'center' });
+        input.focus();
+        // 既存値をクリアしてから入力
+        var nativeSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype, 'value'
+        )?.set || Object.getOwnPropertyDescriptor(
+          window.HTMLTextAreaElement.prototype, 'value'
+        )?.set;
+        if (nativeSetter) {
+          nativeSetter.call(input, step.value);
+        } else {
+          input.value = step.value;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return { status: 'passed' };
+      }
+      case 'select': {
+        var sel = await waitForElement(step.target, timeout);
+        sel.scrollIntoView({ block: 'center' });
+        sel.value = step.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        return { status: 'passed' };
+      }
+      case 'assert': {
+        var assertEl = await waitForElement(step.target, timeout);
+        var text = assertEl.textContent || '';
+        if (!text.includes(step.value)) {
+          throw new Error('Assertion failed: expected "' + step.value + '" in "' + text.trim() + '"');
+        }
+        return { status: 'passed' };
+      }
+      case 'wait': {
+        if (step.value === 'hidden') {
+          // 要素が非表示になるまで待つ
+          await new Promise(function(resolve, reject) {
+            var elapsed = 0;
+            var interval = setInterval(function() {
+              elapsed += 100;
+              var el = resolveSelector(step.target);
+              if (!el || el.offsetParent === null) { clearInterval(interval); resolve(); return; }
+              if (elapsed >= timeout) { clearInterval(interval); reject(new Error('Element still visible: ' + step.target)); }
+            }, 100);
+          });
+        } else {
+          await waitForElement(step.target, timeout);
+        }
+        return { status: 'passed' };
+      }
+      case 'screenshot':
+        return { status: 'passed' };
+      default:
+        throw new Error('Unknown action: ' + step.action);
+    }
+  };
+})();
+`;
+
+  const SLOW_MO = 300; // ステップ間の待機時間(ms) — 操作の様子を見やすくする
+
+  async function runStoryOnWebview(story: StoryInput, keepSession: boolean): Promise<{
     storyId: string;
     status: "passed" | "failed";
     stepResults: StepResult[];
   }> {
-    const browser = await chromium.launch({ channel: "chrome", headless: true });
-    const context = await browser.newContext();
-    let activePage = await context.newPage();
+    const wc = findWebviewContents();
+    if (!wc) {
+      throw new Error("Preview が見つかりません。Preview タブを開いてください。");
+    }
 
-    // 新タブが開いたら追跡
-    context.on("page", async (newPage) => {
-      activePage = newPage;
-    });
+    // セッションクリア
+    if (!keepSession) {
+      await wc.session.clearStorageData();
+      await wc.session.clearCache();
+    }
+
+    // 実行エンジンを注入
+    await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
 
     const stepResults: StepResult[] = [];
     let storyStatus: "passed" | "failed" = "passed";
@@ -454,54 +559,79 @@ function registerIpcHandlers() {
     for (const step of story.steps) {
       if (storyStatus === "failed") {
         stepResults.push({ order: step.order, status: "skipped", durationMs: 0 });
+        mainWindow?.webContents.send("step:progress", {
+          storyId: story.id,
+          order: step.order,
+          status: "skipped",
+          durationMs: 0,
+        });
         continue;
       }
 
-      if (step.action === "click") {
-        // click は新タブを開く可能性がある — 同時にリッスン
-        const pageCountBefore = context.pages().length;
-        const result = await executeStep(activePage, step, story.baseUrl);
-        stepResults.push(result);
-        if (result.status === "failed") {
-          storyStatus = "failed";
-          continue;
-        }
-        // click 後に新タブが開いていたら、ロード完了を待つ
-        if (context.pages().length > pageCountBefore) {
-          activePage = context.pages()[context.pages().length - 1];
-          await activePage.waitForLoadState("domcontentloaded").catch(() => {});
-        }
-      } else {
-        // タブが閉じていたら残りのタブに戻る
-        if (activePage.isClosed()) {
-          const pages = context.pages();
-          if (pages.length > 0) {
-            activePage = pages[pages.length - 1];
+      // ステップ開始通知
+      mainWindow?.webContents.send("step:progress", {
+        storyId: story.id,
+        order: step.order,
+        status: "running",
+        durationMs: 0,
+      });
+
+      const start = Date.now();
+      try {
+        if (step.action === "navigate") {
+          const url = resolveUrl(step.target, story.baseUrl);
+          await wc.loadURL(url);
+          // ロード後に実行エンジンを再注入
+          await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
+        } else {
+          const result = await wc.executeJavaScript(
+            `window.__storywrightExecuteStep(${JSON.stringify(step)})`,
+          );
+          if (!result || result.status !== "passed") {
+            throw new Error(result?.error || "Step failed");
           }
         }
-        const result = await executeStep(activePage, step, story.baseUrl);
-        stepResults.push(result);
-        if (result.status === "failed") {
-          storyStatus = "failed";
-        }
+        const durationMs = Date.now() - start;
+        stepResults.push({ order: step.order, status: "passed", durationMs });
+        mainWindow?.webContents.send("step:progress", {
+          storyId: story.id,
+          order: step.order,
+          status: "passed",
+          durationMs,
+        });
+      } catch (err: unknown) {
+        const durationMs = Date.now() - start;
+        const message = err instanceof Error ? err.message : String(err);
+        stepResults.push({ order: step.order, status: "failed", durationMs, error: message });
+        mainWindow?.webContents.send("step:progress", {
+          storyId: story.id,
+          order: step.order,
+          status: "failed",
+          durationMs,
+          error: message,
+        });
+        storyStatus = "failed";
+      }
+
+      // slowMo: 操作の様子を見やすくする
+      if (storyStatus !== "failed") {
+        await new Promise((r) => setTimeout(r, SLOW_MO));
       }
     }
-
-    await browser.close();
 
     return { storyId: story.id, status: storyStatus, stepResults };
   }
 
-  ipcMain.handle("run-story", async (_event, storyJson: string) => {
+  ipcMain.handle("run-story", async (_event, storyJson: string, keepSession?: boolean) => {
     const story: StoryInput = JSON.parse(storyJson);
-    return runStoryOnce(story);
+    return runStoryOnWebview(story, keepSession ?? false);
   });
 
   // === 繰り返し実行 ===
 
   let repeatCancelled = false;
 
-  ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number) => {
+  ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number, keepSession?: boolean) => {
     const story: StoryInput = JSON.parse(storyJson);
     repeatCancelled = false;
 
@@ -512,7 +642,7 @@ function registerIpcHandlers() {
     for (let i = 0; i < repeatCount; i++) {
       if (repeatCancelled) break;
 
-      const iterResult = await runStoryOnce(story);
+      const iterResult = await runStoryOnWebview(story, keepSession ?? false);
       iterations.push(iterResult);
 
       if (iterResult.status === "passed") passedIterations++;

@@ -48,10 +48,18 @@ export interface RecordedStep {
   timestamp: number;
 }
 
+export type StepProgress = {
+  storyId: string;
+  order: number;
+  status: "running" | "passed" | "failed" | "skipped";
+  durationMs: number;
+  error?: string;
+};
+
 // Electron IPC bridge
 export interface StorywrightAPI {
-  runStory: (storyJson: string) => Promise<StoryResult>;
-  runStoryRepeat: (storyJson: string, repeatCount: number) => Promise<RepeatResult>;
+  runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
+  runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRepeat: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
@@ -59,6 +67,7 @@ export interface StorywrightAPI {
   onRecorderStep: (callback: (step: RecordedStep) => void) => () => void;
   onAssertDone: (callback: () => void) => () => void;
   onRepeatProgress: (callback: (progress: RepeatProgress) => void) => () => void;
+  onStepProgress: (callback: (progress: StepProgress) => void) => () => void;
 }
 
 declare global {

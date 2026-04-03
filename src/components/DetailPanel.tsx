@@ -8,8 +8,8 @@ interface DetailPanelProps {
   story: Story | null;
   storyResult: StoryResult | null;
   onUpdateStory: (story: Story) => void;
-  onRunStory: (story: Story) => void;
-  onRunStoryRepeat: (story: Story, repeatCount: number) => void;
+  onRunStory: (story: Story, keepSession: boolean) => void;
+  onRunStoryRepeat: (story: Story, repeatCount: number, keepSession: boolean) => void;
   onCancelRepeat: () => void;
   isRunning: boolean;
   repeatProgress: { current: number; total: number } | null;
@@ -49,6 +49,7 @@ export function DetailPanel({
   const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
   const [showRepeatPopover, setShowRepeatPopover] = useState(false);
   const [repeatCount, setRepeatCount] = useState(10);
+  const [keepSession, setKeepSession] = useState(false);
   const dragCounter = useRef(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -310,6 +311,15 @@ export function DetailPanel({
 
       {story && (
         <div className="panel-actions">
+          <label className="panel-checkbox">
+            <input
+              type="checkbox"
+              checked={keepSession}
+              onChange={(e) => setKeepSession(e.target.checked)}
+              disabled={isRunning}
+            />
+            セッションを維持
+          </label>
           {repeatResult && !isRunning && (
             <div className="repeat-summary">
               {repeatResult.failedIterations === 0
@@ -330,7 +340,7 @@ export function DetailPanel({
               <button
                 className="btn btn-primary split-button-main"
                 type="button"
-                onClick={() => onRunStory(story)}
+                onClick={() => onRunStory(story, keepSession)}
                 disabled={isRunning || story.steps.length === 0}
               >
                 {isRunning ? "⏳ Running..." : "▶ Run"}
@@ -385,7 +395,7 @@ export function DetailPanel({
                       type="button"
                       onClick={() => {
                         setShowRepeatPopover(false);
-                        onRunStoryRepeat(story, repeatCount);
+                        onRunStoryRepeat(story, repeatCount, keepSession);
                       }}
                     >
                       ▶ 実行

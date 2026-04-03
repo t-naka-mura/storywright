@@ -13,7 +13,8 @@ import { PreviewPanel } from "./components/PreviewPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
-import type { Story, StoryResult, RecordedStep } from "./types";
+import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
+import { useUrlHistory } from "./hooks/useUrlHistory";
 import "./App.css";
 
 type MainView = "canvas" | "preview";
@@ -75,9 +76,12 @@ function App() {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [baseUrl, setBaseUrl] = useState("https://example.com");
+  const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory } = useUrlHistory();
   const [error, setError] = useState<{ title: string; message: string } | null>(null);
   const [mainView, setMainView] = useState<MainView>("preview");
+  const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
+  const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
+  const unsubRepeatRef = useRef<(() => void) | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isAssertMode, setIsAssertMode] = useState(false);
   const [recordedStepCount, setRecordedStepCount] = useState(0);
@@ -151,13 +155,14 @@ function App() {
 
   const handleRunStory = useCallback(async (story: Story) => {
     setIsRunning(true);
+    const effectiveBaseUrl = story.baseUrl || baseUrl;
+    addUrlToHistory(effectiveBaseUrl);
     setResults((prev) => {
       const next = { ...prev };
       delete next[story.id];
       return next;
     });
     try {
-      const effectiveBaseUrl = story.baseUrl || baseUrl;
       const result = await window.storywright.runStory(
         JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
       );
@@ -171,7 +176,49 @@ function App() {
     } finally {
       setIsRunning(false);
     }
-  }, [baseUrl]);
+  }, [baseUrl, addUrlToHistory]);
+
+  const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number) => {
+    setIsRunning(true);
+    const effectiveBaseUrl = story.baseUrl || baseUrl;
+    addUrlToHistory(effectiveBaseUrl);
+    setRepeatProgress({ current: 0, total: repeatCount });
+    setRepeatResult(null);
+    setResults((prev) => {
+      const next = { ...prev };
+      delete next[story.id];
+      return next;
+    });
+
+    // 進捗リスナー
+    const unsub = window.storywright.onRepeatProgress((progress: RepeatProgress) => {
+      setRepeatProgress({ current: progress.current, total: progress.total });
+    });
+    unsubRepeatRef.current = unsub;
+
+    try {
+      const result = await window.storywright.runStoryRepeat(
+        JSON.stringify({ ...story, baseUrl: effectiveBaseUrl }),
+        repeatCount,
+      );
+      setRepeatResult(result);
+    } catch (err) {
+      setError({ title: "繰り返し実行エラー", message: String(err) });
+    } finally {
+      setIsRunning(false);
+      setRepeatProgress(null);
+      unsubRepeatRef.current?.();
+      unsubRepeatRef.current = null;
+    }
+  }, [baseUrl, addUrlToHistory]);
+
+  const handleCancelRepeat = useCallback(async () => {
+    try {
+      await window.storywright.cancelRepeat();
+    } catch {
+      // キャンセルエラーは無視
+    }
+  }, []);
 
   const handleStartRecording = useCallback(async () => {
     // Story が未選択ならスタンドアロン Story を自動生成
@@ -293,6 +340,8 @@ function App() {
         onAddNode={handleAddNode}
         baseUrl={baseUrl}
         onBaseUrlChange={setBaseUrl}
+        urlHistory={urlHistory}
+        onDeleteUrlHistory={deleteUrlFromHistory}
         mainView={mainView}
         onMainViewChange={setMainView}
         isRecording={isRecording}
@@ -315,7 +364,7 @@ function App() {
             onUpdateEdgeLabel={handleUpdateEdgeLabel}
           />
         ) : (
-          <PreviewPanel url={previewUrl} isRecording={isRecording} recordedStepCount={recordedStepCount} />
+          <PreviewPanel url={previewUrl} isRecording={isRecording} recordedStepCount={recordedStepCount} onUrlLoaded={addUrlToHistory} />
         )}
         <DetailPanel
           isOpen={isPanelOpen}
@@ -324,7 +373,11 @@ function App() {
           storyResult={selectedResult}
           onUpdateStory={handleUpdateStory}
           onRunStory={handleRunStory}
+          onRunStoryRepeat={handleRunStoryRepeat}
+          onCancelRepeat={handleCancelRepeat}
           isRunning={isRunning}
+          repeatProgress={repeatProgress}
+          repeatResult={repeatResult}
           mainView={mainView}
           standaloneStories={standaloneStories}
           onAssignStory={handleAssignStory}

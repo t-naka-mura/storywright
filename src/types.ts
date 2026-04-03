@@ -26,6 +26,21 @@ export type StoryResult = {
   stepResults: StepResult[];
 };
 
+export type RepeatResult = {
+  storyId: string;
+  totalIterations: number;
+  completedIterations: number;
+  passedIterations: number;
+  failedIterations: number;
+  iterations: StoryResult[];
+};
+
+export type RepeatProgress = {
+  current: number;
+  total: number;
+  lastResult: StoryResult;
+};
+
 export interface RecordedStep {
   action: "navigate" | "click" | "type" | "select" | "assert";
   target: string;
@@ -36,11 +51,14 @@ export interface RecordedStep {
 // Electron IPC bridge
 export interface StorywrightAPI {
   runStory: (storyJson: string) => Promise<StoryResult>;
+  runStoryRepeat: (storyJson: string, repeatCount: number) => Promise<RepeatResult>;
+  cancelRepeat: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   toggleAssertMode: (enabled: boolean) => Promise<void>;
   onRecorderStep: (callback: (step: RecordedStep) => void) => () => void;
   onAssertDone: (callback: () => void) => () => void;
+  onRepeatProgress: (callback: (progress: RepeatProgress) => void) => () => void;
 }
 
 declare global {

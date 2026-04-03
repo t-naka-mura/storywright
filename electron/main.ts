@@ -7,12 +7,14 @@ let isRecording = false;
 let recordingWebContentsId: number | null = null;
 
 function createMainWindow() {
-  const iconPath = path.join(__dirname, "../public/logo.svg");
+  const iconPath = process.platform === "darwin"
+    ? path.join(__dirname, "../build/icon.icns")
+    : path.join(__dirname, "../build/icon.ico");
   const icon = nativeImage.createFromPath(iconPath);
 
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1440,
+    height: 900,
     icon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -356,6 +358,12 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
   // 現在のページにも注入
   wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
 
+  // ドメイン跨ぎナビゲーション時にスクリプトを再注入
+  wc.on("did-navigate", () => {
+    if (!isRecording) return;
+    wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
+  });
+
   // navigate キャプチャ (CDP の Page.frameNavigated)
   wc.debugger.on("message", (_event, method, params) => {
     if (!isRecording) return;
@@ -370,9 +378,10 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
   });
 
   // click/type/select/assert キャプチャ (console.debug 経由)
-  wc.on("console-message", (_event, level, message) => {
+  // console.debug = level 0 (verbose) in Electron
+  wc.on("console-message", (_event, _level, message) => {
     if (!isRecording) return;
-    if (level === 2 && message.startsWith("__storywright_step__")) {
+    if (message.startsWith("__storywright_step__")) {
       try {
         const step = JSON.parse(message.replace("__storywright_step__", ""));
         mainWindow?.webContents.send("recorder:step", step);
@@ -380,8 +389,7 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
         // パース失敗は無視
       }
     }
-    // アサートモード完了通知
-    if (level === 2 && message === "__storywright_assert_done__") {
+    if (message === "__storywright_assert_done__") {
       mainWindow?.webContents.send("recorder:assert-done");
     }
   });
@@ -425,11 +433,20 @@ function registerIpcHandlers() {
       .catch(() => {});
   });
 
-  ipcMain.handle("run-story", async (_event, storyJson: string) => {
-    const story: StoryInput = JSON.parse(storyJson);
+  // ストーリーを1回実行する共通ロジック
+  async function runStoryOnce(story: StoryInput): Promise<{
+    storyId: string;
+    status: "passed" | "failed";
+    stepResults: StepResult[];
+  }> {
     const browser = await chromium.launch({ channel: "chrome", headless: true });
     const context = await browser.newContext();
-    const page = await context.newPage();
+    let activePage = await context.newPage();
+
+    // 新タブが開いたら追跡
+    context.on("page", async (newPage) => {
+      activePage = newPage;
+    });
 
     const stepResults: StepResult[] = [];
     let storyStatus: "passed" | "failed" = "passed";
@@ -439,20 +456,88 @@ function registerIpcHandlers() {
         stepResults.push({ order: step.order, status: "skipped", durationMs: 0 });
         continue;
       }
-      const result = await executeStep(page, step, story.baseUrl);
-      stepResults.push(result);
-      if (result.status === "failed") {
-        storyStatus = "failed";
+
+      if (step.action === "click") {
+        // click は新タブを開く可能性がある — 同時にリッスン
+        const pageCountBefore = context.pages().length;
+        const result = await executeStep(activePage, step, story.baseUrl);
+        stepResults.push(result);
+        if (result.status === "failed") {
+          storyStatus = "failed";
+          continue;
+        }
+        // click 後に新タブが開いていたら、ロード完了を待つ
+        if (context.pages().length > pageCountBefore) {
+          activePage = context.pages()[context.pages().length - 1];
+          await activePage.waitForLoadState("domcontentloaded").catch(() => {});
+        }
+      } else {
+        // タブが閉じていたら残りのタブに戻る
+        if (activePage.isClosed()) {
+          const pages = context.pages();
+          if (pages.length > 0) {
+            activePage = pages[pages.length - 1];
+          }
+        }
+        const result = await executeStep(activePage, step, story.baseUrl);
+        stepResults.push(result);
+        if (result.status === "failed") {
+          storyStatus = "failed";
+        }
       }
     }
 
     await browser.close();
 
+    return { storyId: story.id, status: storyStatus, stepResults };
+  }
+
+  ipcMain.handle("run-story", async (_event, storyJson: string) => {
+    const story: StoryInput = JSON.parse(storyJson);
+    return runStoryOnce(story);
+  });
+
+  // === 繰り返し実行 ===
+
+  let repeatCancelled = false;
+
+  ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number) => {
+    const story: StoryInput = JSON.parse(storyJson);
+    repeatCancelled = false;
+
+    const iterations: Array<{ storyId: string; status: "passed" | "failed"; stepResults: StepResult[] }> = [];
+    let passedIterations = 0;
+    let failedIterations = 0;
+
+    for (let i = 0; i < repeatCount; i++) {
+      if (repeatCancelled) break;
+
+      const iterResult = await runStoryOnce(story);
+      iterations.push(iterResult);
+
+      if (iterResult.status === "passed") passedIterations++;
+      else failedIterations++;
+
+      // 進捗を renderer に通知
+      mainWindow?.webContents.send("repeat:progress", {
+        current: i + 1,
+        total: repeatCount,
+        lastResult: iterResult,
+      });
+    }
+
     return {
       storyId: story.id,
-      status: storyStatus,
-      stepResults,
+      totalIterations: repeatCount,
+      completedIterations: iterations.length,
+      passedIterations,
+      failedIterations,
+      iterations,
     };
+  });
+
+  ipcMain.handle("cancel-repeat", async () => {
+    repeatCancelled = true;
   });
 }
 

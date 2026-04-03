@@ -3,6 +3,11 @@ import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
 
 export default defineConfig({
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test/setup.ts"],
+  },
   plugins: [
     react(),
     electron([

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("run-story", storyJson, keepSession),
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) =>
     ipcRenderer.invoke("run-story-repeat", storyJson, repeatCount, keepSession),
+  cancelRun: () => ipcRenderer.invoke("cancel-run"),
   cancelRepeat: () => ipcRenderer.invoke("cancel-repeat"),
   startRecording: () => ipcRenderer.invoke("start-recording"),
   stopRecording: () => ipcRenderer.invoke("stop-recording"),

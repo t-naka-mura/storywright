@@ -10,6 +10,7 @@ interface DetailPanelProps {
   onUpdateStory: (story: Story) => void;
   onRunStory: (story: Story, keepSession: boolean) => void;
   onRunStoryRepeat: (story: Story, repeatCount: number, keepSession: boolean) => void;
+  onCancelRun: () => void;
   onCancelRepeat: () => void;
   isRunning: boolean;
   repeatProgress: { current: number; total: number } | null;
@@ -17,6 +18,7 @@ interface DetailPanelProps {
   mainView: "canvas" | "preview";
   standaloneStories: Story[];
   onAssignStory?: (standaloneStoryId: string) => void;
+  onSelectStory?: (storyId: string) => void;
 }
 
 function createEmptyStep(order: number): Step {
@@ -35,6 +37,7 @@ export function DetailPanel({
   onUpdateStory,
   onRunStory,
   onRunStoryRepeat,
+  onCancelRun,
   onCancelRepeat,
   isRunning,
   repeatProgress,
@@ -42,6 +45,7 @@ export function DetailPanel({
   mainView,
   standaloneStories,
   onAssignStory,
+  onSelectStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -291,21 +295,39 @@ export function DetailPanel({
             </button>
           </>
         ) : (
-          <p className="panel-empty">
-            {mainView === "preview" ? (
-              <>
-                ● REC を押して録画を開始するか、
-                <br />
-                Canvas でストーリーを選択してください
-              </>
-            ) : (
-              <>
-                エッジ（ストーリー）をクリックすると
-                <br />
-                ステップが表示されます
-              </>
+          <div className="panel-empty-area">
+            <p className="panel-empty">
+              {mainView === "preview" ? (
+                <>
+                  ● REC を押して録画を開始するか、
+                  <br />
+                  Canvas でストーリーを選択してください
+                </>
+              ) : (
+                <>
+                  エッジ（ストーリー）をクリックすると
+                  <br />
+                  ステップが表示されます
+                </>
+              )}
+            </p>
+            {standaloneStories.length > 0 && (
+              <div className="standalone-story-list">
+                <label className="panel-field-label">録画済みストーリー</label>
+                {standaloneStories.map((s) => (
+                  <button
+                    key={s.id}
+                    className="standalone-story-item"
+                    type="button"
+                    onClick={() => onSelectStory?.(s.id)}
+                  >
+                    <span className="standalone-story-title">{s.title}</span>
+                    <span className="standalone-story-meta">{s.steps.length} ステップ</span>
+                  </button>
+                ))}
+              </div>
             )}
-          </p>
+          </div>
         )}
       </div>
 
@@ -335,15 +357,23 @@ export function DetailPanel({
             >
               ⏳ Running ({repeatProgress.current}/{repeatProgress.total})... ■ Stop
             </button>
+          ) : isRunning ? (
+            <button
+              className="btn btn-danger"
+              type="button"
+              onClick={onCancelRun}
+            >
+              ⏳ Running... ■ Stop
+            </button>
           ) : (
             <div className="split-button" ref={dropdownRef}>
               <button
                 className="btn btn-primary split-button-main"
                 type="button"
                 onClick={() => onRunStory(story, keepSession)}
-                disabled={isRunning || story.steps.length === 0}
+                disabled={story.steps.length === 0}
               >
-                {isRunning ? "⏳ Running..." : "▶ Run"}
+                ▶ Run
               </button>
               <button
                 className="btn btn-primary split-button-toggle"

@@ -62,6 +62,7 @@ export interface StorywrightAPI {
   loadData: (filename: string) => Promise<unknown>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
+  cancelRun: () => Promise<void>;
   cancelRepeat: () => Promise<void>;
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;

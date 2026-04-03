@@ -261,15 +261,18 @@ const RECORDER_INJECTION_SCRIPT = `
     });
   }, false);
 
-  // type capture (debounced per element + blur fallback)
-  var inputTimers = new WeakMap();
-  var inputSent = new WeakMap(); // 最後に送信した値を記録
+  // type capture: フォーカスアウト時に確定値を送信（シンプル・確実）
+  var lastSentValues = new WeakMap();
 
-  function sendTypeStep(target) {
+  function captureInputValue(target) {
+    if (!target || !target.tagName) return;
+    var tag = target.tagName.toLowerCase();
+    if (tag !== 'input' && tag !== 'textarea' && !target.isContentEditable) return;
     var value = target.value || target.textContent || '';
-    // 同じ値を重複送信しない
-    if (inputSent.get(target) === value) return;
-    inputSent.set(target, value);
+    if (!value) return;
+    // 同じ要素・同じ値なら送信しない
+    if (lastSentValues.get(target) === value) return;
+    lastSentValues.set(target, value);
     sendStep({
       action: 'type',
       target: generateSelector(target),
@@ -278,40 +281,26 @@ const RECORDER_INJECTION_SCRIPT = `
     });
   }
 
-  function isInputElement(el) {
-    if (!el || !el.tagName) return false;
-    var tag = el.tagName.toLowerCase();
-    return tag === 'input' || tag === 'textarea' || el.isContentEditable;
-  }
+  // blur: フォーカスが外れた時に確定値を送信
+  document.addEventListener('blur', function(e) {
+    if (window.__storywrightAssertMode) return;
+    captureInputValue(e.target);
+  }, true);
 
-  function handleInput(e) {
+  // change: フォームリセットや autocomplete 対応
+  document.addEventListener('change', function(e) {
     if (window.__storywrightAssertMode) return;
     var target = e.target;
-    if (!isInputElement(target)) return;
+    if (target && target.tagName === 'SELECT') return; // SELECT は別ハンドラ
+    captureInputValue(target);
+  }, true);
 
-    if (inputTimers.has(target)) clearTimeout(inputTimers.get(target));
-    inputTimers.set(target, setTimeout(function() {
-      sendTypeStep(target);
-      inputTimers.delete(target);
-    }, 500));
-  }
-  document.addEventListener('input', handleInput, true);
-
-  // blur / change でフォールバック: デバウンスが発火する前にフォーカスが外れた場合に確実にキャプチャ
-  function handleBlurOrChange(e) {
+  // keydown Enter: フォーム送信前にキャプチャ（blur が発火しないケース対応）
+  document.addEventListener('keydown', function(e) {
     if (window.__storywrightAssertMode) return;
-    var target = e.target;
-    if (!isInputElement(target)) return;
-    // 保留中のデバウンスをキャンセルして即送信
-    if (inputTimers.has(target)) {
-      clearTimeout(inputTimers.get(target));
-      inputTimers.delete(target);
-    }
-    var value = target.value || target.textContent || '';
-    if (value) sendTypeStep(target);
-  }
-  document.addEventListener('blur', handleBlurOrChange, true);
-  document.addEventListener('change', handleBlurOrChange, true);
+    if (e.key !== 'Enter') return;
+    captureInputValue(e.target);
+  }, true);
 
   // select capture (change イベントのうち SELECT 要素のみ)
   document.addEventListener('change', function(e) {
@@ -596,8 +585,9 @@ function registerIpcHandlers() {
 `;
 
   const SLOW_MO = 300; // ステップ間の待機時間(ms) — 操作の様子を見やすくする
+  let currentRunId = 0;
 
-  async function runStoryOnWebview(story: StoryInput, keepSession: boolean): Promise<{
+  async function runStoryOnWebview(story: StoryInput, keepSession: boolean, runId: number): Promise<{
     storyId: string;
     status: "passed" | "failed";
     stepResults: StepResult[];
@@ -620,6 +610,10 @@ function registerIpcHandlers() {
     let storyStatus: "passed" | "failed" = "passed";
 
     for (const step of story.steps) {
+      if (runId !== currentRunId) {
+        stepResults.push({ order: step.order, status: "skipped", durationMs: 0 });
+        continue;
+      }
       if (storyStatus === "failed") {
         stepResults.push({ order: step.order, status: "skipped", durationMs: 0 });
         mainWindow?.webContents.send("step:progress", {
@@ -687,7 +681,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle("run-story", async (_event, storyJson: string, keepSession?: boolean) => {
     const story: StoryInput = JSON.parse(storyJson);
-    return runStoryOnWebview(story, keepSession ?? false);
+    const runId = ++currentRunId;
+    return runStoryOnWebview(story, keepSession ?? false, runId);
+  });
+
+  ipcMain.handle("cancel-run", async () => {
+    currentRunId++;
   });
 
   // === 繰り返し実行 ===
@@ -705,7 +704,8 @@ function registerIpcHandlers() {
     for (let i = 0; i < repeatCount; i++) {
       if (repeatCancelled) break;
 
-      const iterResult = await runStoryOnWebview(story, keepSession ?? false);
+      const runId = ++currentRunId;
+      const iterResult = await runStoryOnWebview(story, keepSession ?? false, runId);
       iterations.push(iterResult);
 
       if (iterResult.status === "passed") passedIterations++;

@@ -42,6 +42,7 @@ function App() {
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
+  const runCancelledRef = useRef(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isAssertMode, setIsAssertMode] = useState(false);
   const [recordedStepCount, setRecordedStepCount] = useState(0);
@@ -144,6 +145,7 @@ function App() {
   }, []);
 
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
+    runCancelledRef.current = false;
     setIsRunning(true);
     setMainView("preview");
     const effectiveBaseUrl = story.baseUrl || baseUrl;
@@ -188,7 +190,10 @@ function App() {
         message: errorMsg,
       });
     } finally {
-      setIsRunning(false);
+      // キャンセル後に新しい実行が始まっている場合は isRunning を触らない
+      if (!runCancelledRef.current) {
+        setIsRunning(false);
+      }
       unsubStep();
     }
   }, [baseUrl, addUrlToHistory]);
@@ -237,6 +242,16 @@ function App() {
     }
   }, []);
 
+  const handleCancelRun = useCallback(async () => {
+    runCancelledRef.current = true;
+    setIsRunning(false);
+    try {
+      await window.storywright.cancelRun();
+    } catch {
+      // キャンセルエラーは無視
+    }
+  }, []);
+
   const handleStartRecording = useCallback(async () => {
     // Story が未選択ならスタンドアロン Story を自動生成
     let targetStoryId = activeStoryId;
@@ -252,6 +267,7 @@ function App() {
 
     const recordingStoryId = targetStoryId;
     setRecordedStepCount(0);
+    if (!isPanelOpen) setIsPanelOpen(true);
     setIsRecording(true);
 
     // ステップ受信リスナーを登録
@@ -284,7 +300,7 @@ function App() {
       setIsRecording(false);
       setError({ title: "録画開始エラー", message: String(err) });
     }
-  }, [activeStoryId]);
+  }, [activeStoryId, isPanelOpen]);
 
   const handleStopRecording = useCallback(async () => {
     setIsRecording(false);
@@ -398,6 +414,7 @@ function App() {
           onUpdateStory={handleUpdateStory}
           onRunStory={handleRunStory}
           onRunStoryRepeat={handleRunStoryRepeat}
+          onCancelRun={handleCancelRun}
           onCancelRepeat={handleCancelRepeat}
           isRunning={isRunning}
           repeatProgress={repeatProgress}
@@ -405,6 +422,7 @@ function App() {
           mainView={mainView}
           standaloneStories={standaloneStories}
           onAssignStory={handleAssignStory}
+          onSelectStory={setSelectedStoryId}
         />
       </div>
       <StatusBar nodeCount={nodes.length} edgeCount={edges.length} isRecording={isRecording} isAssertMode={isAssertMode} />

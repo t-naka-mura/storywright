@@ -30,10 +30,13 @@ let isRecording = false;
 let recordingWebContentsId: number | null = null;
 
 function createMainWindow() {
-  const iconPath = process.platform === "darwin"
-    ? path.join(__dirname, "../build/icon.icns")
-    : path.join(__dirname, "../build/icon.ico");
+  const iconPath = path.join(__dirname, "../build/icon.png");
   const icon = nativeImage.createFromPath(iconPath);
+
+  // macOS: Dock アイコンを設定（dev モードでも反映されるように）
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setIcon(icon);
+  }
 
   mainWindow = new BrowserWindow({
     width: 1440,

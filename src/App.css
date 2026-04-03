@@ -1036,112 +1036,37 @@ li:hover + li .step-insert-zone .btn-insert {
   cursor: pointer;
 }
 
-/* Split button */
-.split-button {
-  position: relative;
+/* Run count (inline) */
+.run-count-row {
   display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.split-button-main {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  flex: 1;
+.run-count-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
-.split-button-toggle {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 6px 8px;
-  font-size: 10px;
-}
-
-.split-button-dropdown {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: 4px;
-  background: var(--color-bg-surface);
+.run-count-input {
+  width: 60px;
+  padding: 3px 6px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-lg);
-  min-width: 180px;
-  z-index: 10;
-}
-
-.split-button-dropdown-item {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  text-align: left;
-  background: none;
-  border: none;
   font-size: 13px;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.split-button-dropdown-item:hover {
-  background: var(--color-bg-hover);
-}
-
-/* Repeat popover */
-.repeat-popover {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: 4px;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 16px;
-  min-width: 220px;
-  z-index: 10;
-}
-
-.repeat-popover-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text);
-  margin-bottom: 8px;
-}
-
-.repeat-popover-input {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
   text-align: right;
+  background: var(--color-bg-surface);
+  color: var(--color-text);
+  outline: none;
 }
 
-.repeat-popover-unit {
-  font-size: 13px;
+.run-count-input:focus {
+  border-color: var(--color-accent);
+}
+
+.run-count-unit {
+  font-size: 12px;
   color: var(--color-text-secondary);
-  margin-left: 4px;
-}
-
-.repeat-popover-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.btn-ghost {
-  background: none;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  padding: 4px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.btn-ghost:hover {
-  background: var(--color-bg-hover);
 }
 
 /* Repeat summary */

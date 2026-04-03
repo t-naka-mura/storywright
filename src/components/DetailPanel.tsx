@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import type { Story, Step, StoryResult, RepeatResult } from "../types";
 import { StepEditor } from "./StepEditor";
 
@@ -52,24 +52,9 @@ export function DetailPanel({
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
-  const [showRepeatPopover, setShowRepeatPopover] = useState(false);
-  const [repeatCount, setRepeatCount] = useState(10);
+  const [repeatCount, setRepeatCount] = useState(1);
   const [keepSession, setKeepSession] = useState(false);
   const dragCounter = useRef(0);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // ドロップダウン外クリックで閉じる
-  useEffect(() => {
-    if (!showRepeatDropdown) return;
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowRepeatDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [showRepeatDropdown]);
 
   const handleAddStep = () => {
     if (!story) return;
@@ -378,6 +363,19 @@ export function DetailPanel({
                 : `⚠️ ${repeatResult.passedIterations}/${repeatResult.totalIterations} passed, ${repeatResult.failedIterations} failed`}
             </div>
           )}
+          <div className="run-count-row">
+            <label className="run-count-label">実行回数:</label>
+            <input
+              className="run-count-input"
+              type="number"
+              min={1}
+              max={1000}
+              value={repeatCount}
+              onChange={(e) => setRepeatCount(Math.max(1, Number(e.target.value)))}
+              disabled={isRunning}
+            />
+            <span className="run-count-unit">回</span>
+          </div>
           {isRunning && repeatProgress ? (
             <button
               className="btn btn-danger"
@@ -395,74 +393,18 @@ export function DetailPanel({
               ⏳ Running... ■ Stop
             </button>
           ) : (
-            <div className="split-button" ref={dropdownRef}>
-              <button
-                className="btn btn-primary split-button-main"
-                type="button"
-                onClick={() => onRunStory(story, keepSession)}
-                disabled={story.steps.length === 0}
-              >
-                ▶ Run
-              </button>
-              <button
-                className="btn btn-primary split-button-toggle"
-                type="button"
-                onClick={() => setShowRepeatDropdown((v) => !v)}
-                disabled={isRunning || story.steps.length === 0}
-              >
-                ▼
-              </button>
-              {showRepeatDropdown && (
-                <div className="split-button-dropdown">
-                  <button
-                    className="split-button-dropdown-item"
-                    type="button"
-                    onClick={() => {
-                      setShowRepeatDropdown(false);
-                      setShowRepeatPopover(true);
-                    }}
-                  >
-                    🔁 繰り返し実行...
-                  </button>
-                </div>
-              )}
-              {showRepeatPopover && (
-                <div className="repeat-popover">
-                  <label className="repeat-popover-label">
-                    繰り返し回数:
-                  </label>
-                  <input
-                    className="repeat-popover-input"
-                    type="number"
-                    min={2}
-                    max={1000}
-                    value={repeatCount}
-                    onChange={(e) => setRepeatCount(Math.max(2, Number(e.target.value)))}
-                    autoFocus
-                  />
-                  <span className="repeat-popover-unit">回</span>
-                  <div className="repeat-popover-actions">
-                    <button
-                      className="btn btn-ghost"
-                      type="button"
-                      onClick={() => setShowRepeatPopover(false)}
-                    >
-                      キャンセル
-                    </button>
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      onClick={() => {
-                        setShowRepeatPopover(false);
-                        onRunStoryRepeat(story, repeatCount, keepSession);
-                      }}
-                    >
-                      ▶ 実行
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() =>
+                repeatCount > 1
+                  ? onRunStoryRepeat(story, repeatCount, keepSession)
+                  : onRunStory(story, keepSession)
+              }
+              disabled={story.steps.length === 0}
+            >
+              ▶ Run
+            </button>
           )}
         </div>
       )}

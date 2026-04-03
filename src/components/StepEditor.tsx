@@ -58,6 +58,7 @@ export function StepEditor({ step, onSave, onCancel, onDelete }: StepEditorProps
           </label>
           <input
             className="step-editor-input"
+            type={draft.sensitive && draft.action !== "navigate" ? "password" : "text"}
             value={draft.action === "navigate" ? draft.target : draft.value}
             onChange={(e) =>
               draft.action === "navigate"
@@ -68,6 +69,19 @@ export function StepEditor({ step, onSave, onCancel, onDelete }: StepEditorProps
               draft.action === "navigate" ? "https://..." : "入力値・期待値"
             }
           />
+        </div>
+      )}
+
+      {draft.action === "type" && (
+        <div className="step-editor-field">
+          <label className="step-editor-checkbox">
+            <input
+              type="checkbox"
+              checked={draft.sensitive ?? false}
+              onChange={(e) => setDraft({ ...draft, sensitive: e.target.checked || undefined })}
+            />
+            機密値（パスワード等）
+          </label>
         </div>
       )}
 

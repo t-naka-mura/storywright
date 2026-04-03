@@ -4,6 +4,7 @@ export interface Step {
   target: string;
   value: string;
   description: string;
+  sensitive?: boolean;
 }
 
 export interface Story {
@@ -47,6 +48,7 @@ export interface RecordedStep {
   target: string;
   value: string;
   timestamp: number;
+  sensitive?: boolean;
 }
 
 export type StepProgress = {

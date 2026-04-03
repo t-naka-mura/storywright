@@ -190,6 +190,7 @@ function App() {
           target: step.target,
           value: step.value,
           description: "",
+          ...(step.sensitive ? { sensitive: true } : {}),
         };
         return { ...prev, [recordingStoryId]: { ...story, steps: [...story.steps, newStep] } };
       });

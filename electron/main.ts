@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, webContents, nativeImage } = require("electron");
+const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -10,16 +10,75 @@ function getDataDir(): string {
   return dir;
 }
 
+// === Sensitive 値の暗号化/復号 ===
+
+function encryptValue(value: string): string {
+  if (!safeStorage.isEncryptionAvailable()) return value;
+  const encrypted = safeStorage.encryptString(value);
+  return "enc:" + encrypted.toString("base64");
+}
+
+function decryptValue(value: string): string {
+  if (!value.startsWith("enc:")) return value;
+  if (!safeStorage.isEncryptionAvailable()) return value;
+  const buffer = Buffer.from(value.slice(4), "base64");
+  return safeStorage.decryptString(buffer);
+}
+
+function encryptSensitiveSteps(data: unknown): unknown {
+  if (!data || typeof data !== "object") return data;
+  const record = data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>;
+  const result: Record<string, unknown> = {};
+  for (const [key, story] of Object.entries(record)) {
+    if (!story || !Array.isArray(story.steps)) {
+      result[key] = story;
+      continue;
+    }
+    result[key] = {
+      ...story,
+      steps: story.steps.map((step) =>
+        step.sensitive && step.value
+          ? { ...step, value: encryptValue(step.value) }
+          : step
+      ),
+    };
+  }
+  return result;
+}
+
+function decryptSensitiveSteps(data: unknown): unknown {
+  if (!data || typeof data !== "object") return data;
+  const record = data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>;
+  const result: Record<string, unknown> = {};
+  for (const [key, story] of Object.entries(record)) {
+    if (!story || !Array.isArray(story.steps)) {
+      result[key] = story;
+      continue;
+    }
+    result[key] = {
+      ...story,
+      steps: story.steps.map((step) =>
+        step.sensitive && step.value
+          ? { ...step, value: decryptValue(step.value) }
+          : step
+      ),
+    };
+  }
+  return result;
+}
+
 function saveData(filename: string, data: unknown): void {
   const filePath = path.join(getDataDir(), filename);
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  const toSave = filename === "stories.json" ? encryptSensitiveSteps(data) : data;
+  fs.writeFileSync(filePath, JSON.stringify(toSave, null, 2), "utf-8");
 }
 
 function loadData<T>(filename: string, fallback: T): T {
   const filePath = path.join(getDataDir(), filename);
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    return (filename === "stories.json" ? decryptSensitiveSteps(raw) : raw) as T;
   } catch {
     return fallback;
   }
@@ -74,6 +133,7 @@ interface Step {
   action: string;
   target: string;
   value: string;
+  sensitive?: boolean;
 }
 
 interface StoryInput {
@@ -276,12 +336,17 @@ const RECORDER_INJECTION_SCRIPT = `
     // 同じ要素・同じ値なら送信しない
     if (lastSentValues.get(target) === value) return;
     lastSentValues.set(target, value);
-    sendStep({
+    var stepData = {
       action: 'type',
       target: generateSelector(target),
       value: value,
       timestamp: Date.now()
-    });
+    };
+    // input[type="password"] は自動的に sensitive とする
+    if (tag === 'input' && target.type === 'password') {
+      stepData.sensitive = true;
+    }
+    sendStep(stepData);
   }
 
   // blur: フォーカスが外れた時に確定値を送信

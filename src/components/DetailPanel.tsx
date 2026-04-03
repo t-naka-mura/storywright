@@ -258,9 +258,10 @@ export function DetailPanel({
                         </span>
                         <div className="step-content" onClick={() => setEditingIndex(index)}>
                           <span className="step-action">{step.action}</span>
+                          {step.sensitive && <span className="step-sensitive-badge" title="機密値">🔒</span>}
                           <span className="step-detail">
                             {step.target}
-                            {step.value ? ` → ${step.value}` : ""}
+                            {step.value ? ` → ${step.sensitive ? "••••••" : step.value}` : ""}
                           </span>
                           {result?.error && (
                             <span className="step-error">{result.error}</span>

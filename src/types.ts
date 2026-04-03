@@ -11,6 +11,7 @@ export interface Story {
   title: string;
   baseUrl?: string;
   steps: Step[];
+  createdAt?: number; // Unix timestamp (ms)
 }
 
 export type StepResult = {

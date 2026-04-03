@@ -168,7 +168,7 @@ function App() {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const id = `story-${++storyIdCounter}`;
-      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [] };
+      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [], createdAt: Date.now() };
       setStories((prev) => ({ ...prev, [id]: newStory }));
       setSelectedStoryId(id);
       targetStoryId = id;
@@ -308,6 +308,7 @@ function App() {
           repeatProgress={repeatProgress}
           repeatResult={repeatResult}
           standaloneStories={standaloneStories}
+          storyResults={results}
           onSelectStory={setSelectedStoryId}
           onDeselectStory={handleDeselectStory}
           onDeleteStory={handleDeleteStory}

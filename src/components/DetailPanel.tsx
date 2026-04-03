@@ -15,6 +15,7 @@ interface DetailPanelProps {
   repeatProgress: { current: number; total: number } | null;
   repeatResult: RepeatResult | null;
   standaloneStories: Story[];
+  storyResults: Record<string, StoryResult>;
   onSelectStory?: (storyId: string) => void;
   onDeselectStory?: () => void;
   onDeleteStory?: (storyId: string) => void;
@@ -41,12 +42,14 @@ export function DetailPanel({
   repeatProgress,
   repeatResult,
   standaloneStories,
+  storyResults,
   onSelectStory,
   onDeselectStory,
   onDeleteStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
@@ -300,14 +303,37 @@ export function DetailPanel({
             </p>
             {standaloneStories.length > 0 && (
               <div className="standalone-story-list">
-                <label className="panel-field-label">録画済みストーリー</label>
-                {standaloneStories.map((s) => (
+                <div className="story-list-header">
+                  <label className="panel-field-label">録画済みストーリー</label>
+                  <select
+                    className="story-sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as "newest" | "oldest" | "name")}
+                  >
+                    <option value="newest">新しい順</option>
+                    <option value="oldest">古い順</option>
+                    <option value="name">名前順</option>
+                  </select>
+                </div>
+                {[...standaloneStories].sort((a, b) => {
+                  if (sortBy === "name") return a.title.localeCompare(b.title);
+                  const aTime = a.createdAt ?? 0;
+                  const bTime = b.createdAt ?? 0;
+                  return sortBy === "newest" ? bTime - aTime : aTime - bTime;
+                }).map((s) => {
+                  const result = storyResults[s.id];
+                  return (
                   <div key={s.id} className="standalone-story-item">
                     <button
                       className="standalone-story-select"
                       type="button"
                       onClick={() => onSelectStory?.(s.id)}
                     >
+                      {result && (
+                        <span className={`story-badge story-badge-${result.status}`}>
+                          {result.status === "passed" ? "✓" : "✗"}
+                        </span>
+                      )}
                       <span className="standalone-story-title">{s.title}</span>
                       <span className="standalone-story-meta">{s.steps.length} ステップ</span>
                     </button>
@@ -325,7 +351,8 @@ export function DetailPanel({
                       </button>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

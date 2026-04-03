@@ -4,17 +4,13 @@
 
 # Storywright
 
-ユーザーストーリーをキャンバスで設計し、ブラウザ操作の録画から E2E テストを作成・実行できる Electron デスクトップアプリ。
-
-> **Future extension**: Figma / Google Spreadsheet からのストーリーインポートを予定
-
-![Storywright Screenshot](docs/images/screenshot.png)
+ブラウザ操作を録画して、そのまま E2E テストとして実行できる Electron デスクトップアプリ。
 
 ## スタック
 
 - **フロントエンド**: React 19 + TypeScript + Vite
 - **バックエンド**: Electron (Node.js)
-- **E2Eテスト**: Playwright（main process で直接実行）
+- **E2Eテスト**: CDP (Chrome DevTools Protocol) で Preview webview 上に直接実行
 - **パッケージマネージャ**: pnpm
 
 ## セットアップ

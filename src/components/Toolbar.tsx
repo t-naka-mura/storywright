@@ -17,9 +17,9 @@ interface ToolbarProps {
 export function Toolbar({
   onTogglePanel,
   isPanelOpen,
-  onAddNode,
-  mainView,
-  onMainViewChange,
+  onAddNode: _onAddNode,
+  mainView: _mainView,
+  onMainViewChange: _onMainViewChange,
   isRecording,
   isAssertMode,
   onStartRecording,
@@ -32,32 +32,14 @@ export function Toolbar({
       <div className="toolbar-left">
         <img src="/logo.svg" alt="" className="toolbar-logo" />
         <span className="toolbar-title">Storywright</span>
-        <div className="toolbar-tabs">
-          <button
-            className={`toolbar-tab ${mainView === "preview" ? "active" : ""}`}
-            type="button"
-            onClick={() => onMainViewChange("preview")}
-          >
-            Preview
-          </button>
-          <button
-            className={`toolbar-tab ${mainView === "canvas" ? "active" : ""}`}
-            type="button"
-            onClick={() => onMainViewChange("canvas")}
-          >
-            Canvas
-          </button>
-        </div>
-        <button className="btn" type="button" onClick={onAddNode}>
-          + 画面追加
-        </button>
+        {/* Canvas タブは ADR-015 により一時非表示 */}
         <button className="btn" type="button">
           Import
         </button>
       </div>
       <div className="toolbar-right">
-        {mainView === "preview" && (
-          isRecording ? (
+        {/* mainView は常に preview（ADR-015: Canvas 非表示中） */}
+        {isRecording ? (
             <>
               <button
                 className="btn btn-rec btn-rec-active"
@@ -86,7 +68,7 @@ export function Toolbar({
               ● REC
             </button>
           )
-        )}
+        }
         <button className="btn" type="button" onClick={onTogglePanel}>
           {isPanelOpen ? "▷" : "◁"} Panel
         </button>

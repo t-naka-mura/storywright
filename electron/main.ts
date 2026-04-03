@@ -364,9 +364,10 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
   });
 
   // click/type/select/assert キャプチャ (console.debug 経由)
-  // console.debug = level 0 (verbose) in Electron
-  wc.on("console-message", (_event, _level, message) => {
+  // Electron 35+: console-message は Event オブジェクト形式
+  wc.on("console-message", (event: { message: string; level: number }) => {
     if (!isRecording) return;
+    const message = event.message;
     if (message.startsWith("__storywright_step__")) {
       try {
         const step = JSON.parse(message.replace("__storywright_step__", ""));
@@ -606,8 +607,12 @@ function registerIpcHandlers() {
       await wc.session.clearCache();
     }
 
-    // 実行エンジンを注入
-    await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
+    // 最初のステップが navigate ならそこでエンジン注入するのでスキップ
+    // それ以外なら、現在のページに注入
+    const firstStep = story.steps[0];
+    if (!firstStep || firstStep.action !== "navigate") {
+      await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
+    }
 
     const stepResults: StepResult[] = [];
     let storyStatus: "passed" | "failed" = "passed";
@@ -640,7 +645,34 @@ function registerIpcHandlers() {
       try {
         if (step.action === "navigate") {
           const url = resolveUrl(step.target, story.baseUrl);
-          await wc.loadURL(url);
+          // webview の loadURL はリダイレクト時にハングすることがあるため
+          // did-finish-load / did-fail-load で待機する
+          // CDP の Page.navigate + domContentEventFired でナビゲーション
+          try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
+          await wc.debugger.sendCommand("Page.enable");
+          await new Promise<void>((resolve) => {
+            let resolved = false;
+            const navTimeout = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                wc.debugger.removeListener("message", onMessage);
+                resolve();
+              }
+            }, 15000);
+
+            const onMessage = (_event: unknown, method: string) => {
+              if (resolved) return;
+              if (method === "Page.domContentEventFired" || method === "Page.loadEventFired") {
+                resolved = true;
+                clearTimeout(navTimeout);
+                wc.debugger.removeListener("message", onMessage);
+                resolve();
+              }
+            };
+
+            wc.debugger.on("message", onMessage);
+            wc.debugger.sendCommand("Page.navigate", { url });
+          });
           // ロード後に実行エンジンを再注入
           await wc.executeJavaScript(EXECUTOR_INJECTION_SCRIPT);
         } else {

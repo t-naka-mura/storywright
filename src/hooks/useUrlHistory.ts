@@ -1,46 +1,65 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
-const STORAGE_KEY_HISTORY = "storywright:urlHistory";
-const STORAGE_KEY_LAST = "storywright:lastBaseUrl";
+const FILENAME = "urlHistory.json";
 const MAX_HISTORY = 20;
 const DEFAULT_URL = "https://example.com";
 
+interface UrlHistoryData {
+  lastBaseUrl: string;
+  history: string[];
+}
+
 export function useUrlHistory() {
-  const [baseUrl, setBaseUrlState] = useState(() => {
-    return localStorage.getItem(STORAGE_KEY_LAST) || DEFAULT_URL;
-  });
+  const [baseUrl, setBaseUrlState] = useState(DEFAULT_URL);
+  const [urlHistory, setUrlHistory] = useState<string[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const dataRef = useRef<UrlHistoryData>({ lastBaseUrl: DEFAULT_URL, history: [] });
+
+  // 起動時にファイルから読み込み
+  useEffect(() => {
+    async function load() {
+      const saved = await window.storywright.loadData(FILENAME) as UrlHistoryData | null;
+      if (saved) {
+        setBaseUrlState(saved.lastBaseUrl || DEFAULT_URL);
+        setUrlHistory(saved.history || []);
+        dataRef.current = saved;
+      }
+      setLoaded(true);
+    }
+    load();
+  }, []);
+
+  // ファイルへの永続化
+  const persist = useCallback((data: UrlHistoryData) => {
+    dataRef.current = data;
+    window.storywright.saveData(FILENAME, data);
+  }, []);
 
   const setBaseUrl = useCallback((url: string) => {
     setBaseUrlState(url);
-    if (url) localStorage.setItem(STORAGE_KEY_LAST, url);
-  }, []);
-
-  const [urlHistory, setUrlHistory] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || "[]");
-    } catch {
-      return [];
+    if (url) {
+      persist({ ...dataRef.current, lastBaseUrl: url });
     }
-  });
+  }, [persist]);
 
   const addUrlToHistory = useCallback((url: string) => {
     if (!url || !/^https?:\/\//.test(url)) return;
     setUrlHistory((prev) => {
       const filtered = prev.filter((u) => u !== url);
       const next = [url, ...filtered].slice(0, MAX_HISTORY);
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(next));
+      persist({ lastBaseUrl: url, history: next });
       return next;
     });
-    localStorage.setItem(STORAGE_KEY_LAST, url);
-  }, []);
+    setBaseUrlState(url);
+  }, [persist]);
 
   const deleteUrlFromHistory = useCallback((url: string) => {
     setUrlHistory((prev) => {
       const next = prev.filter((u) => u !== url);
-      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(next));
+      persist({ ...dataRef.current, history: next });
       return next;
     });
-  }, []);
+  }, [persist]);
 
   return {
     baseUrl,
@@ -48,5 +67,6 @@ export function useUrlHistory() {
     urlHistory,
     addUrlToHistory,
     deleteUrlFromHistory,
+    loaded,
   };
 }

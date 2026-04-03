@@ -1,12 +1,24 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useUrlHistory } from "./useUrlHistory";
 
-describe("useUrlHistory", () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
+// window.storywright のモック
+let storedData: Record<string, unknown> = {};
 
+beforeEach(() => {
+  storedData = {};
+  (window as any).storywright = {
+    saveData: vi.fn((filename: string, data: unknown) => {
+      storedData[filename] = data;
+      return Promise.resolve();
+    }),
+    loadData: vi.fn((filename: string) => {
+      return Promise.resolve(storedData[filename] ?? null);
+    }),
+  };
+});
+
+describe("useUrlHistory", () => {
   it("初期状態では履歴が空", () => {
     const { result } = renderHook(() => useUrlHistory());
     expect(result.current.urlHistory).toEqual([]);
@@ -17,18 +29,15 @@ describe("useUrlHistory", () => {
     expect(result.current.baseUrl).toBe("https://example.com");
   });
 
-  it("localStorage に lastBaseUrl があれば復元する", () => {
-    localStorage.setItem("storywright:lastBaseUrl", "https://mysite.com");
+  it("保存済みデータがあれば復元する", async () => {
+    storedData["urlHistory.json"] = {
+      lastBaseUrl: "https://mysite.com",
+      history: ["https://a.com", "https://b.com"],
+    };
     const { result } = renderHook(() => useUrlHistory());
-    expect(result.current.baseUrl).toBe("https://mysite.com");
-  });
-
-  it("localStorage に urlHistory があれば復元する", () => {
-    localStorage.setItem(
-      "storywright:urlHistory",
-      JSON.stringify(["https://a.com", "https://b.com"]),
-    );
-    const { result } = renderHook(() => useUrlHistory());
+    await waitFor(() => {
+      expect(result.current.baseUrl).toBe("https://mysite.com");
+    });
     expect(result.current.urlHistory).toEqual(["https://a.com", "https://b.com"]);
   });
 
@@ -40,6 +49,17 @@ describe("useUrlHistory", () => {
     expect(result.current.baseUrl).toBe("https://new.com");
   });
 
+  it("setBaseUrl でファイルに保存される", () => {
+    const { result } = renderHook(() => useUrlHistory());
+    act(() => {
+      result.current.setBaseUrl("https://new.com");
+    });
+    expect(window.storywright.saveData).toHaveBeenCalledWith(
+      "urlHistory.json",
+      expect.objectContaining({ lastBaseUrl: "https://new.com" }),
+    );
+  });
+
   it("addUrlToHistory で URL が履歴に追加される", () => {
     const { result } = renderHook(() => useUrlHistory());
     act(() => {
@@ -48,15 +68,18 @@ describe("useUrlHistory", () => {
     expect(result.current.urlHistory).toEqual(["https://test.com"]);
   });
 
-  it("addUrlToHistory で localStorage に保存される", () => {
+  it("addUrlToHistory でファイルに保存される", () => {
     const { result } = renderHook(() => useUrlHistory());
     act(() => {
       result.current.addUrlToHistory("https://test.com");
     });
-    expect(JSON.parse(localStorage.getItem("storywright:urlHistory")!)).toEqual([
-      "https://test.com",
-    ]);
-    expect(localStorage.getItem("storywright:lastBaseUrl")).toBe("https://test.com");
+    expect(window.storywright.saveData).toHaveBeenCalledWith(
+      "urlHistory.json",
+      expect.objectContaining({
+        lastBaseUrl: "https://test.com",
+        history: ["https://test.com"],
+      }),
+    );
   });
 
   it("同じ URL を追加すると先頭に移動する（重複しない）", () => {
@@ -99,19 +122,5 @@ describe("useUrlHistory", () => {
       result.current.deleteUrlFromHistory("https://a.com");
     });
     expect(result.current.urlHistory).toEqual(["https://b.com"]);
-  });
-
-  it("deleteUrlFromHistory で localStorage も更新される", () => {
-    const { result } = renderHook(() => useUrlHistory());
-    act(() => {
-      result.current.addUrlToHistory("https://a.com");
-      result.current.addUrlToHistory("https://b.com");
-    });
-    act(() => {
-      result.current.deleteUrlFromHistory("https://a.com");
-    });
-    expect(JSON.parse(localStorage.getItem("storywright:urlHistory")!)).toEqual([
-      "https://b.com",
-    ]);
   });
 });

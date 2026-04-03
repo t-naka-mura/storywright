@@ -4,7 +4,6 @@ import { StepEditor } from "./StepEditor";
 
 interface DetailPanelProps {
   isOpen: boolean;
-  onClose: () => void;
   story: Story | null;
   storyResult: StoryResult | null;
   onUpdateStory: (story: Story) => void;
@@ -17,6 +16,8 @@ interface DetailPanelProps {
   repeatResult: RepeatResult | null;
   standaloneStories: Story[];
   onSelectStory?: (storyId: string) => void;
+  onDeselectStory?: () => void;
+  onDeleteStory?: (storyId: string) => void;
 }
 
 function createEmptyStep(order: number): Step {
@@ -29,7 +30,6 @@ function renumberSteps(steps: Step[]): Step[] {
 
 export function DetailPanel({
   isOpen,
-  onClose,
   story,
   storyResult,
   onUpdateStory,
@@ -42,8 +42,11 @@ export function DetailPanel({
   repeatResult,
   standaloneStories,
   onSelectStory,
+  onDeselectStory,
+  onDeleteStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
@@ -165,12 +168,29 @@ export function DetailPanel({
   return (
     <aside className={`detail-panel${isOpen ? "" : " collapsed"}`}>
       <div className="panel-header">
-        <span className="panel-header-title">
-          {story ? story.title : "ストーリー詳細"}
-        </span>
-        <button className="panel-toggle" type="button" onClick={onClose}>
-          ✕
-        </button>
+        {story && onDeselectStory && (
+          <button className="panel-back" type="button" onClick={onDeselectStory} title="ストーリー一覧に戻る">
+            ←
+          </button>
+        )}
+        {story && editingTitle ? (
+          <input
+            className="panel-header-title-input"
+            value={story.title}
+            onChange={(e) => onUpdateStory({ ...story, title: e.target.value })}
+            onBlur={() => setEditingTitle(false)}
+            onKeyDown={(e) => { if (e.key === "Enter") setEditingTitle(false); }}
+            autoFocus
+          />
+        ) : (
+          <span
+            className="panel-header-title"
+            onClick={() => story && setEditingTitle(true)}
+            title={story ? "クリックでリネーム" : undefined}
+          >
+            {story ? story.title : "ストーリー"}
+          </span>
+        )}
       </div>
 
       <div className="panel-body">
@@ -282,15 +302,29 @@ export function DetailPanel({
               <div className="standalone-story-list">
                 <label className="panel-field-label">録画済みストーリー</label>
                 {standaloneStories.map((s) => (
-                  <button
-                    key={s.id}
-                    className="standalone-story-item"
-                    type="button"
-                    onClick={() => onSelectStory?.(s.id)}
-                  >
-                    <span className="standalone-story-title">{s.title}</span>
-                    <span className="standalone-story-meta">{s.steps.length} ステップ</span>
-                  </button>
+                  <div key={s.id} className="standalone-story-item">
+                    <button
+                      className="standalone-story-select"
+                      type="button"
+                      onClick={() => onSelectStory?.(s.id)}
+                    >
+                      <span className="standalone-story-title">{s.title}</span>
+                      <span className="standalone-story-meta">{s.steps.length} ステップ</span>
+                    </button>
+                    {onDeleteStory && (
+                      <button
+                        className="standalone-story-delete"
+                        type="button"
+                        title="ストーリーを削除"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteStory(s.id);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

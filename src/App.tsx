@@ -252,9 +252,20 @@ function App() {
     setIsPanelOpen((prev) => !prev);
   }, []);
 
-  const handleClosePanel = useCallback(() => {
-    setIsPanelOpen(false);
+  const handleDeselectStory = useCallback(() => {
+    setSelectedStoryId(null);
   }, []);
+
+  const handleDeleteStory = useCallback((storyId: string) => {
+    setStories((prev) => {
+      const next = { ...prev };
+      delete next[storyId];
+      return next;
+    });
+    if (selectedStoryId === storyId) {
+      setSelectedStoryId(null);
+    }
+  }, [selectedStoryId]);
 
   // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
   const previewUrl = isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
@@ -286,7 +297,6 @@ function App() {
         </div>
         <DetailPanel
           isOpen={isPanelOpen}
-          onClose={handleClosePanel}
           story={selectedStory}
           storyResult={selectedResult}
           onUpdateStory={handleUpdateStory}
@@ -299,6 +309,8 @@ function App() {
           repeatResult={repeatResult}
           standaloneStories={standaloneStories}
           onSelectStory={setSelectedStoryId}
+          onDeselectStory={handleDeselectStory}
+          onDeleteStory={handleDeleteStory}
         />
       </div>
       <StatusBar isRecording={isRecording} isAssertMode={isAssertMode} />

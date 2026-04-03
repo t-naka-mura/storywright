@@ -146,7 +146,9 @@ export function PreviewPanel({
           disabled={!canGoBack || isRunning}
           title="戻る"
         >
-          ←
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
         <button
           className="browser-bar-btn"
@@ -155,7 +157,9 @@ export function PreviewPanel({
           disabled={!canGoForward || isRunning}
           title="進む"
         >
-          →
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M7.5 5L12.5 10L7.5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
         <button
           className="browser-bar-btn"
@@ -164,7 +168,10 @@ export function PreviewPanel({
           disabled={!hasUrl || isRunning}
           title="再読み込み"
         >
-          ↻
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M9 1L12 3.5L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
         <div className="browser-bar-url-area" ref={urlBarRef}>
           <input

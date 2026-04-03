@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage } = require("electron");
+const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -86,7 +86,287 @@ function loadData<T>(filename: string, fallback: T): T {
 
 let mainWindow: BrowserWindow | null = null;
 let isRecording = false;
-let recordingWebContentsId: number | null = null;
+let recordingWebContentsIds: number[] = [];
+let previewTabIdCounter = 0;
+let activePreviewTabId: string | null = null;
+let previewBounds = { x: 0, y: 0, width: 0, height: 0 };
+
+interface PreviewTab {
+  id: string;
+  view: Electron.WebContentsView;
+  title: string;
+  url: string;
+  loading: boolean;
+  isClosing: boolean;
+}
+
+const previewTabs: PreviewTab[] = [];
+
+function nextPreviewTabId(): string {
+  return `preview-tab-${++previewTabIdCounter}`;
+}
+
+function getActivePreviewTab(): PreviewTab | null {
+  return previewTabs.find((tab) => tab.id === activePreviewTabId) ?? null;
+}
+
+function getAllPreviewContents(): Electron.WebContents[] {
+  return previewTabs
+    .map((tab) => tab.view.webContents)
+    .filter((wc) => !wc.isDestroyed());
+}
+
+function getActivePreviewContents(): Electron.WebContents | null {
+  return getActivePreviewTab()?.view.webContents ?? null;
+}
+
+function getPreviewState() {
+  return {
+    tabs: previewTabs.map((tab) => {
+      const wc = tab.view.webContents;
+      return {
+        id: tab.id,
+        title: tab.title,
+        url: tab.url,
+        loading: tab.loading,
+        canGoBack: !wc.isDestroyed() ? wc.canGoBack() : false,
+        canGoForward: !wc.isDestroyed() ? wc.canGoForward() : false,
+      };
+    }),
+    activeTabId: activePreviewTabId,
+  };
+}
+
+function sendPreviewState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.webContents.isDestroyed()) return;
+  if (mainWindow.webContents.isLoadingMainFrame()) return;
+  try {
+    mainWindow.webContents.send("preview:state", getPreviewState());
+  } catch {
+    // ignore renderer reload / disposal races
+  }
+}
+
+function canMutateMainContentView() {
+  return !!mainWindow && !mainWindow.isDestroyed();
+}
+
+function syncPreviewViews() {
+  if (!canMutateMainContentView()) return;
+  for (const tab of previewTabs) {
+    if (!mainWindow.contentView.children.includes(tab.view)) {
+      mainWindow.contentView.addChildView(tab.view);
+    }
+    tab.view.setBounds(previewBounds);
+    tab.view.setVisible(
+      tab.id === activePreviewTabId &&
+        previewBounds.width > 0 &&
+        previewBounds.height > 0,
+    );
+  }
+
+  const activeTab = getActivePreviewTab();
+  if (activeTab) {
+    mainWindow.contentView.addChildView(activeTab.view);
+  }
+}
+
+function updatePreviewTabState(tab: PreviewTab) {
+  const wc = tab.view.webContents;
+  if (wc.isDestroyed()) return;
+  const currentUrl = wc.getURL();
+
+  if (currentUrl && currentUrl !== "about:blank") {
+    tab.url = currentUrl;
+  }
+
+  tab.title =
+    wc.getTitle() ||
+    (tab.loading ? "読み込み中..." : tab.url ? tab.url : "新しいタブ");
+  syncPreviewViews();
+  sendPreviewState();
+}
+
+function closePreviewTab(tabId: string, closeContents = true) {
+  const index = previewTabs.findIndex((tab) => tab.id === tabId);
+  if (index === -1) return;
+
+  const [tab] = previewTabs.splice(index, 1);
+  tab.isClosing = true;
+
+  if (canMutateMainContentView()) {
+    try {
+      mainWindow.contentView.removeChildView(tab.view);
+    } catch {
+      // ignore detached or destroyed view teardown
+    }
+  }
+
+  if (closeContents && !tab.view.webContents.isDestroyed()) {
+    try {
+      tab.view.webContents.close();
+    } catch {
+      // ignore
+    }
+  }
+
+  if (activePreviewTabId === tabId) {
+    const fallback = previewTabs[index] ?? previewTabs[index - 1] ?? null;
+    activePreviewTabId = fallback?.id ?? null;
+  }
+
+  if (previewTabs.length === 0) {
+    createPreviewTab();
+    return;
+  }
+
+  syncPreviewViews();
+  sendPreviewState();
+}
+
+function setupNewWindowHandler(wc: Electron.WebContents) {
+  wc.setWindowOpenHandler((details) => {
+    return {
+      action: "allow",
+      createWindow: (options: { webContents?: Electron.WebContents; webPreferences?: Electron.WebPreferences }) => {
+        const popupView = createPreviewView(options.webContents, options.webPreferences);
+        const activate = details.disposition !== "background-tab";
+        const tab = registerPreviewTab(popupView, activate, details.url, "読み込み中...");
+
+        if (details.disposition === "background-tab") {
+          popupView.webContents.loadURL(details.url).catch(() => {});
+        }
+
+        if (details.url) {
+          setTimeout(() => {
+            const popupContents = popupView.webContents;
+            if (popupContents.isDestroyed() || tab.isClosing) return;
+            const currentUrl = popupContents.getURL();
+            const shouldKickNavigation = !currentUrl || currentUrl === "about:blank";
+            if (!shouldKickNavigation) return;
+            tab.loading = true;
+            popupContents.loadURL(details.url).catch(() => {});
+          }, 250);
+        }
+
+        if (isRecording) {
+          setupRecorderOnWebview(tab.view.webContents);
+        }
+
+        return popupView.webContents;
+      },
+    };
+  });
+}
+
+function createPreviewView(
+  existingWebContents?: Electron.WebContents,
+  webPreferences?: Electron.WebPreferences,
+): Electron.WebContentsView {
+  const view = existingWebContents
+    ? new WebContentsView({ webContents: existingWebContents })
+    : new WebContentsView({
+        webPreferences: {
+          ...(webPreferences ?? {}),
+          backgroundThrottling: false,
+        },
+      });
+  view.setBackgroundColor("#00000000");
+  return view;
+}
+
+function registerPreviewTab(
+  view: Electron.WebContentsView,
+  activate = true,
+  initialUrl = "",
+  initialTitle = "新しいタブ",
+): PreviewTab {
+  const tab: PreviewTab = {
+    id: nextPreviewTabId(),
+    view,
+    title: initialTitle,
+    url: initialUrl,
+    loading: false,
+    isClosing: false,
+  };
+
+  const wc = view.webContents;
+  const refresh = () => updatePreviewTabState(tab);
+  const reconcileLoading = () => {
+    if (wc.isDestroyed() || tab.isClosing) return;
+    tab.loading = typeof wc.isLoadingMainFrame === "function"
+      ? wc.isLoadingMainFrame()
+      : wc.isLoading();
+    refresh();
+  };
+  const finishLoading = () => {
+    tab.loading = false;
+    refresh();
+  };
+
+  wc.on("page-title-updated", refresh);
+  wc.on("did-start-loading", () => {
+    tab.loading = true;
+    refresh();
+  });
+  wc.on("did-stop-loading", finishLoading);
+  wc.on("did-finish-load", finishLoading);
+  wc.on("did-fail-load", finishLoading);
+  wc.on("did-fail-provisional-load", finishLoading);
+  wc.on("did-navigate", refresh);
+  wc.on("did-navigate-in-page", refresh);
+  wc.on("destroyed", () => {
+    if (!tab.isClosing) {
+      closePreviewTab(tab.id, false);
+    }
+  });
+
+  setupNewWindowHandler(wc);
+  previewTabs.push(tab);
+
+  if (activate || !activePreviewTabId) {
+    activePreviewTabId = tab.id;
+  }
+
+  updatePreviewTabState(tab);
+  for (const delay of [0, 100, 500, 1500]) {
+    setTimeout(reconcileLoading, delay);
+  }
+  return tab;
+}
+
+function createPreviewTab(url = "", activate = true): PreviewTab {
+  const view = createPreviewView();
+  const tab = registerPreviewTab(view, activate, url, url ? "読み込み中..." : "新しいタブ");
+  if (url) {
+    view.webContents.loadURL(url).catch(() => {});
+  }
+  return tab;
+}
+
+function destroyPreviewTabs() {
+  while (previewTabs.length > 0) {
+    const tab = previewTabs.pop();
+    if (!tab) continue;
+    tab.isClosing = true;
+    if (canMutateMainContentView()) {
+      try {
+        mainWindow.contentView.removeChildView(tab.view);
+      } catch {
+        // ignore detached or destroyed view teardown
+      }
+    }
+    if (!tab.view.webContents.isDestroyed()) {
+      try {
+        tab.view.webContents.close();
+      } catch {
+        // ignore
+      }
+    }
+  }
+  activePreviewTabId = null;
+}
 
 function createMainWindow() {
   const iconPath = path.join(__dirname, "../build/icon.png");
@@ -116,6 +396,7 @@ function createMainWindow() {
   }
 
   mainWindow.on("closed", () => {
+    destroyPreviewTabs();
     mainWindow = null;
   });
 }
@@ -385,13 +666,12 @@ const RECORDER_INJECTION_SCRIPT = `
 })();
 `;
 
-function findWebviewContents(): Electron.WebContents | null {
-  const all = webContents.getAllWebContents();
-  return all.find((wc: Electron.WebContents) => wc.getType() === "webview") ?? null;
-}
-
 function setupRecorderOnWebview(wc: Electron.WebContents) {
-  recordingWebContentsId = wc.id;
+  if (recordingWebContentsIds.includes(wc.id)) return;
+  recordingWebContentsIds.push(wc.id);
+
+  // 新ウィンドウハンドラも確実にセット
+  setupNewWindowHandler(wc);
 
   // CDP 接続してインジェクションスクリプトを自動注入
   try {
@@ -448,16 +728,17 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
 }
 
 function teardownRecorder() {
-  if (recordingWebContentsId === null) return;
-  try {
-    const wc = webContents.fromId(recordingWebContentsId);
-    if (wc && !wc.isDestroyed()) {
-      wc.debugger.detach();
+  for (const id of recordingWebContentsIds) {
+    try {
+      const wc = webContents.fromId(id);
+      if (wc && !wc.isDestroyed()) {
+        wc.debugger.detach();
+      }
+    } catch {
+      // 既にデタッチ済み
     }
-  } catch {
-    // 既にデタッチ済み
   }
-  recordingWebContentsId = null;
+  recordingWebContentsIds = [];
 }
 
 // === IPC Handlers ===
@@ -472,13 +753,72 @@ function registerIpcHandlers() {
     return loadData(filename, null);
   });
 
+  ipcMain.handle("preview:get-state", async () => getPreviewState());
+
+  ipcMain.handle(
+    "preview:set-bounds",
+    async (_event, bounds: { x: number; y: number; width: number; height: number }) => {
+      previewBounds = {
+        x: Math.max(0, Math.round(bounds.x)),
+        y: Math.max(0, Math.round(bounds.y)),
+        width: Math.max(0, Math.round(bounds.width)),
+        height: Math.max(0, Math.round(bounds.height)),
+      };
+      syncPreviewViews();
+    },
+  );
+
+  ipcMain.handle("preview:create-tab", async (_event, url?: string) => {
+    createPreviewTab(url ?? "");
+  });
+
+  ipcMain.handle("preview:close-tab", async (_event, tabId: string) => {
+    closePreviewTab(tabId);
+  });
+
+  ipcMain.handle("preview:activate-tab", async (_event, tabId: string) => {
+    if (!previewTabs.some((tab) => tab.id === tabId)) return;
+    activePreviewTabId = tabId;
+    syncPreviewViews();
+    sendPreviewState();
+  });
+
+  ipcMain.handle("preview:load-url", async (_event, url: string) => {
+    const activeTab = getActivePreviewTab() ?? createPreviewTab();
+    activeTab.loading = true;
+    activeTab.title = "読み込み中...";
+    activeTab.url = url;
+    activeTab.view.webContents.loadURL(url).catch(() => {});
+    sendPreviewState();
+  });
+
+  ipcMain.handle("preview:go-back", async () => {
+    const wc = getActivePreviewContents();
+    if (wc?.canGoBack()) {
+      wc.goBack();
+    }
+  });
+
+  ipcMain.handle("preview:go-forward", async () => {
+    const wc = getActivePreviewContents();
+    if (wc?.canGoForward()) {
+      wc.goForward();
+    }
+  });
+
+  ipcMain.handle("preview:reload", async () => {
+    getActivePreviewContents()?.reload();
+  });
+
   ipcMain.handle("start-recording", async () => {
-    const wc = findWebviewContents();
-    if (!wc) {
+    const allWc = getAllPreviewContents();
+    if (allWc.length === 0) {
       throw new Error("Preview が見つかりません。Preview タブを開いてください。");
     }
     isRecording = true;
-    setupRecorderOnWebview(wc);
+    for (const wc of allWc) {
+      setupRecorderOnWebview(wc);
+    }
   });
 
   ipcMain.handle("stop-recording", async () => {
@@ -487,11 +827,15 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("toggle-assert-mode", async (_event, enabled: boolean) => {
-    if (recordingWebContentsId === null) return;
-    const wc = webContents.fromId(recordingWebContentsId);
-    if (!wc || wc.isDestroyed()) return;
-    wc.executeJavaScript(`window.__storywrightSetAssertMode(${enabled})`)
-      .catch(() => {});
+    for (const id of recordingWebContentsIds) {
+      try {
+        const wc = webContents.fromId(id);
+        if (wc && !wc.isDestroyed()) {
+          wc.executeJavaScript(`window.__storywrightSetAssertMode(${enabled})`)
+            .catch(() => {});
+        }
+      } catch { /* ignore */ }
+    }
   });
 
   // === Webview 上でのステップ実行 ===
@@ -698,7 +1042,7 @@ function registerIpcHandlers() {
     status: "passed" | "failed";
     stepResults: StepResult[];
   }> {
-    const wc = findWebviewContents();
+    const wc = getActivePreviewContents();
     if (!wc) {
       throw new Error("Preview が見つかりません。Preview タブを開いてください。");
     }

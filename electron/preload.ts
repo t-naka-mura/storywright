@@ -42,4 +42,27 @@ contextBridge.exposeInMainWorld("storywright", {
       ipcRenderer.removeListener("step:progress", listener);
     };
   },
+  getPreviewState: () => ipcRenderer.invoke("preview:get-state"),
+  setPreviewBounds: (bounds: unknown) => ipcRenderer.invoke("preview:set-bounds", bounds),
+  createPreviewTab: (url?: string) => ipcRenderer.invoke("preview:create-tab", url),
+  closePreviewTab: (tabId: string) => ipcRenderer.invoke("preview:close-tab", tabId),
+  activatePreviewTab: (tabId: string) => ipcRenderer.invoke("preview:activate-tab", tabId),
+  loadPreviewUrl: (url: string) => ipcRenderer.invoke("preview:load-url", url),
+  previewGoBack: () => ipcRenderer.invoke("preview:go-back"),
+  previewGoForward: () => ipcRenderer.invoke("preview:go-forward"),
+  previewReload: () => ipcRenderer.invoke("preview:reload"),
+  onPreviewState: (callback: (state: unknown) => void) => {
+    const listener = (_event: unknown, state: unknown) => callback(state);
+    ipcRenderer.on("preview:state", listener);
+    return () => {
+      ipcRenderer.removeListener("preview:state", listener);
+    };
+  },
+  onNewTab: (callback: (url: string) => void) => {
+    const listener = (_event: unknown, url: string) => callback(url);
+    ipcRenderer.on("new-tab", listener);
+    return () => {
+      ipcRenderer.removeListener("new-tab", listener);
+    };
+  },
 });

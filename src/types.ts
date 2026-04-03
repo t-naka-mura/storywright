@@ -59,6 +59,27 @@ export type StepProgress = {
   error?: string;
 };
 
+export type PreviewBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type PreviewTabState = {
+  id: string;
+  title: string;
+  url: string;
+  loading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+};
+
+export type PreviewState = {
+  tabs: PreviewTabState[];
+  activeTabId: string | null;
+};
+
 // Electron IPC bridge
 export interface StorywrightAPI {
   saveData: (filename: string, data: unknown) => Promise<void>;
@@ -74,6 +95,17 @@ export interface StorywrightAPI {
   onAssertDone: (callback: () => void) => () => void;
   onRepeatProgress: (callback: (progress: RepeatProgress) => void) => () => void;
   onStepProgress: (callback: (progress: StepProgress) => void) => () => void;
+  getPreviewState: () => Promise<PreviewState>;
+  setPreviewBounds: (bounds: PreviewBounds) => Promise<void>;
+  createPreviewTab: (url?: string) => Promise<void>;
+  closePreviewTab: (tabId: string) => Promise<void>;
+  activatePreviewTab: (tabId: string) => Promise<void>;
+  loadPreviewUrl: (url: string) => Promise<void>;
+  previewGoBack: () => Promise<void>;
+  previewGoForward: () => Promise<void>;
+  previewReload: () => Promise<void>;
+  onPreviewState: (callback: (state: PreviewState) => void) => () => void;
+  onNewTab: (callback: (url: string) => void) => () => void;
 }
 
 declare global {

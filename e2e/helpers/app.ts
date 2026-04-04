@@ -25,6 +25,7 @@ type LaunchOptions = {
 
 type FixtureServer = {
   origin: string;
+  localhostOrigin: string;
   close: () => Promise<void>;
 };
 
@@ -485,6 +486,42 @@ export async function startFixtureSite(): Promise<FixtureServer> {
       return;
     }
 
+    if (requestUrl === "/cross-host-shop") {
+      const port = (server.address() as { port: number }).port;
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Cross-Host Shop</h1>
+              <p id="shop-host">${request.headers.host ?? ""}</p>
+              <button id="go-to-cart">カートへ進む</button>
+              <script>
+                document.getElementById('go-to-cart').addEventListener('click', () => {
+                  window.location.href = 'http://127.0.0.1:${port}/cross-host-cart';
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/cross-host-cart") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Cross-Host Cart</h1>
+              <p id="cart-host">${request.headers.host ?? ""}</p>
+              <p id="cart-status">注文確定</p>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
     if (requestUrl === "/item-b") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(`<!doctype html>
@@ -532,6 +569,7 @@ export async function startFixtureSite(): Promise<FixtureServer> {
 
   return {
     origin: `http://127.0.0.1:${address.port}`,
+    localhostOrigin: `http://localhost:${address.port}`,
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {

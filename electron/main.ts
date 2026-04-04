@@ -1634,7 +1634,7 @@ function registerIpcHandlers() {
             const errorMessage = error instanceof Error ? error.message : String(error);
             const navigationTriggeredContextReset =
               resolvedStep.action === "click" &&
-              /Execution context was destroyed/i.test(errorMessage);
+              /Execution context was destroyed|navigated or clos|Target closed/i.test(errorMessage);
 
             if (!navigationTriggeredContextReset) {
               throw error;
@@ -1652,7 +1652,7 @@ function registerIpcHandlers() {
             const exceptionText = evalResult.exceptionDetails.text || "Step execution failed";
             const navigationTriggeredContextReset =
               resolvedStep.action === "click" &&
-              /Execution context was destroyed/i.test(exceptionText);
+              /Execution context was destroyed|navigated or clos|Target closed/i.test(exceptionText);
 
             if (navigationTriggeredContextReset) {
               await waitForWebContentsReady(wc);

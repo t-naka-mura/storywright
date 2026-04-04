@@ -130,25 +130,34 @@ describe("SettingsPanel", () => {
     expect(screen.getByText("No matching requirements.")).toBeInTheDocument();
   });
 
-  it("domain を並び替えて削除できる", async () => {
+  it("domain tab を切り替えて current domain を削除できる", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderSettingsPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Move down" }));
+    fireEvent.click(screen.getByRole("tab", { name: "US" }));
 
     await waitFor(() => {
-      const domainButtons = screen.getAllByRole("button").filter((button) =>
-        ["Japan", "US"].includes(button.textContent ?? ""),
-      );
-      expect(domainButtons.map((button) => button.textContent)).toEqual(["US", "Japan"]);
+      expect(screen.getByText("Editing US")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete domain" }));
+    expect(screen.getByDisplayValue("us-token")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete current domain" }));
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Japan" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tab", { name: "US" })).not.toBeInTheDocument();
     });
 
-    expect(confirmSpy).toHaveBeenCalledWith('Delete domain "Japan"?');
+    expect(confirmSpy).toHaveBeenCalledWith('Delete domain "US"?');
+  });
+
+  it("domain を追加すると新しい tab が選択される", async () => {
+    renderSettingsPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Add domain" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Editing Domain 3")).toBeInTheDocument();
+    });
   });
 });

@@ -1,10 +1,5 @@
 import { useEffect, useState } from "react";
-import type {
-  EnvironmentDomain,
-  EnvironmentSettings,
-  EnvironmentSourceStatus,
-  ImportedEnvironmentValues,
-} from "../types";
+import type { EnvironmentDomain, EnvironmentSettings, EnvironmentSourceStatus, ImportedEnvironmentValues } from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
 function getEnvironmentDomains(settings: EnvironmentSettings) {
@@ -79,17 +74,6 @@ function createNextDomainId(domains: EnvironmentDomain[]) {
   return `domain-${domainIdCounter}`;
 }
 
-function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
-  if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) {
-    return items;
-  }
-
-  const nextItems = items.slice();
-  const [movedItem] = nextItems.splice(fromIndex, 1);
-  nextItems.splice(toIndex, 0, movedItem);
-  return nextItems;
-}
-
 interface SettingsPanelProps {
   requirements: EnvironmentRequirement[];
   environmentSettings: EnvironmentSettings;
@@ -110,7 +94,6 @@ export function SettingsPanel({
   const missingCount = requirements.filter((requirement) => requirement.status === "missing").length;
   const domains = getEnvironmentDomains(environmentSettings);
   const activeDomain = domains.find((domain) => domain.id === environmentSettings.activeDomainId) ?? domains[0] ?? null;
-  const activeDomainIndex = activeDomain ? domains.findIndex((domain) => domain.id === activeDomain.id) : -1;
   const envValuesKey = JSON.stringify(activeDomain?.values ?? []);
   const [domainNameDraft, setDomainNameDraft] = useState(activeDomain?.name ?? "");
   const [environmentValueRows, setEnvironmentValueRows] = useState<EnvironmentValueRow[]>(
@@ -220,35 +203,8 @@ export function SettingsPanel({
                 <span className="settings-nav-count">{requirements.length}</span>
               </button>
             </nav>
-            <div className="settings-domain-list">
-              {domains.map((domain) => (
-                <button
-                  key={domain.id}
-                  type="button"
-                  className={`settings-domain-item ${domain.id === activeDomain?.id ? "settings-domain-item-active" : ""}`}
-                  onClick={() => {
-                    void saveDomains(domains, domain.id);
-                  }}
-                >
-                  {domain.name}
-                </button>
-              ))}
-              <button
-                type="button"
-                className="settings-text-button"
-                onClick={() => {
-                  const nextId = createNextDomainId(domains);
-                  void saveDomains(
-                    [...domains, { id: nextId, name: `Domain ${domains.length + 1}`, values: [] }],
-                    nextId,
-                  );
-                }}
-              >
-                Add domain
-              </button>
-            </div>
             <p className="settings-nav-note">
-              Story と一緒に export されない local configuration を扱います。
+              Domain は上部タブで切り替えます。Story と一緒に export されない local configuration を扱います。
             </p>
           </aside>
 
@@ -269,65 +225,78 @@ export function SettingsPanel({
               )}
             </div>
 
+            <div className="settings-domain-tabs" role="tablist" aria-label="Environment domains">
+              {domains.map((domain) => (
+                <button
+                  key={domain.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={domain.id === activeDomain?.id}
+                  className={`settings-domain-tab ${domain.id === activeDomain?.id ? "settings-domain-tab-active" : ""}`}
+                  onClick={() => {
+                    void saveDomains(domains, domain.id);
+                  }}
+                >
+                  {domain.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="settings-domain-tab settings-domain-tab-add"
+                onClick={() => {
+                  const nextId = createNextDomainId(domains);
+                  void saveDomains(
+                    [...domains, { id: nextId, name: `Domain ${domains.length + 1}`, values: [] }],
+                    nextId,
+                  );
+                }}
+              >
+                + Add domain
+              </button>
+            </div>
+
             <div className="settings-section settings-section-compact">
               <div className="settings-section-header">
-                <input
-                  className="settings-domain-name-input"
-                  value={domainNameDraft}
-                  onChange={(event) => setDomainNameDraft(event.target.value)}
-                  onBlur={() => {
-                    if (!activeDomain) return;
-                    const nextName = domainNameDraft.trim() || activeDomain.name;
-                    if (nextName !== activeDomain.name) {
-                      void updateActiveDomain({ name: nextName });
-                    }
-                  }}
-                  placeholder="Domain name"
-                />
-                <div className="settings-domain-actions">
-                  <button
-                    className="btn btn-sm"
-                    type="button"
-                    disabled={activeDomainIndex <= 0}
-                    onClick={() => {
-                      if (activeDomainIndex <= 0 || !activeDomain) return;
-                      void saveDomains(moveItem(domains, activeDomainIndex, activeDomainIndex - 1), activeDomain.id);
+                <div className="settings-domain-header-row">
+                  <div>
+                    <div className="settings-subsection-title">Environment Values</div>
+                    <p className="settings-section-description">
+                      選択中の domain の key/value を編集します。ここに入れた値が最優先で使われます。
+                    </p>
+                  </div>
+                  {activeDomain && <div className="settings-domain-active-label">Editing {activeDomain.name}</div>}
+                </div>
+                <div className="settings-domain-manage-row">
+                  <input
+                    className="settings-domain-name-input"
+                    value={domainNameDraft}
+                    onChange={(event) => setDomainNameDraft(event.target.value)}
+                    onBlur={() => {
+                      if (!activeDomain) return;
+                      const nextName = domainNameDraft.trim() || activeDomain.name;
+                      if (nextName !== activeDomain.name) {
+                        void updateActiveDomain({ name: nextName });
+                      }
                     }}
-                  >
-                    Move up
-                  </button>
+                    placeholder="Domain name"
+                  />
                   <button
-                    className="btn btn-sm"
+                    className="settings-text-button"
                     type="button"
-                    disabled={activeDomainIndex < 0 || activeDomainIndex >= domains.length - 1}
-                    onClick={() => {
-                      if (activeDomainIndex < 0 || activeDomainIndex >= domains.length - 1 || !activeDomain) return;
-                      void saveDomains(moveItem(domains, activeDomainIndex, activeDomainIndex + 1), activeDomain.id);
-                    }}
-                  >
-                    Move down
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    type="button"
-                    disabled={!activeDomain}
+                    disabled={!activeDomain || domains.length <= 1}
                     onClick={() => {
                       if (!activeDomain) return;
                       const shouldDelete = window.confirm(`Delete domain \"${activeDomain.name}\"?`);
                       if (!shouldDelete) return;
 
                       const nextDomains = domains.filter((domain) => domain.id !== activeDomain.id);
-                      const nextActiveDomain = nextDomains[Math.max(0, activeDomainIndex - 1)] ?? nextDomains[0] ?? null;
+                      const nextActiveDomain = nextDomains[0] ?? null;
                       void saveDomains(nextDomains, nextActiveDomain?.id);
                     }}
                   >
-                    Delete domain
+                    Delete current domain
                   </button>
                 </div>
-                <h3 className="settings-subsection-title">Environment Values</h3>
-                <p className="settings-section-description">
-                  実行で使う key/value を直接入力します。ここに入れた値が最優先で使われます。
-                </p>
               </div>
               <div className="settings-search-row">
                 <input

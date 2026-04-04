@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { resolveStoryEnvironmentVariables } = require("./resolveEnvPlaceholders");
 const { prepareStoriesForPersistence, hydrateStoriesWithSecrets } = require("./storySecrets");
 
 const STORIES_FILENAME = "stories.json";
@@ -1229,7 +1230,7 @@ function registerIpcHandlers() {
   }
 
   ipcMain.handle("run-story", async (_event, storyJson: string, keepSession?: boolean) => {
-    const story: StoryInput = JSON.parse(storyJson);
+    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson));
     const runId = ++currentRunId;
     return runStoryOnWebview(story, keepSession ?? false, runId);
   });
@@ -1243,7 +1244,7 @@ function registerIpcHandlers() {
   let repeatCancelled = false;
 
   ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number, keepSession?: boolean) => {
-    const story: StoryInput = JSON.parse(storyJson);
+    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson));
     repeatCancelled = false;
 
     const iterations: Array<{ storyId: string; status: "passed" | "failed"; stepResults: StepResult[] }> = [];

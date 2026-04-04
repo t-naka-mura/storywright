@@ -38,6 +38,7 @@
   --toolbar-height: 52px;
   --statusbar-height: 32px;
   --panel-width: 360px;
+  --settings-titlebar-height: 46px;
 }
 
 /* === Reset === */
@@ -68,8 +69,103 @@ body,
   background: #f6f3ee;
 }
 
+.settings-window-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--settings-titlebar-height);
+  padding: 0 14px 0 18px;
+  background: rgba(235, 231, 224, 0.92);
+  border-bottom: 1px solid rgba(217, 213, 208, 0.92);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.settings-window-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.settings-window-titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+.settings-window-chrome-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-window-chrome-button:hover {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(217, 213, 208, 0.92);
+  color: var(--color-text);
+}
+
+.settings-window-chrome-button:focus-visible {
+  outline: 2px solid rgba(91, 123, 215, 0.45);
+  outline-offset: 1px;
+}
+
+.settings-window-chrome-button-close:hover {
+  background: rgba(217, 87, 87, 0.14);
+  border-color: rgba(217, 87, 87, 0.26);
+  color: #a13b3b;
+}
+
+.settings-window-chrome-icon {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.settings-window-chrome-icon-expand::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.settings-window-chrome-icon-close::before,
+.settings-window-chrome-icon-close::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 12px;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.settings-window-chrome-icon-close::before {
+  transform: rotate(45deg);
+}
+
+.settings-window-chrome-icon-close::after {
+  transform: rotate(-45deg);
+}
+
 .settings-window-body {
-  height: 100vh;
+  height: calc(100vh - var(--settings-titlebar-height));
   overflow-y: auto;
   overflow-x: hidden;
 }

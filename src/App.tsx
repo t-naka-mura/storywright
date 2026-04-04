@@ -169,6 +169,14 @@ function App() {
     window.storywright.openSettingsWindow().catch(() => {});
   }, []);
 
+  const handleCloseCurrentWindow = useCallback(() => {
+    window.storywright.closeCurrentWindow().catch(() => {});
+  }, []);
+
+  const handleToggleCurrentWindowZoom = useCallback(() => {
+    window.storywright.toggleCurrentWindowZoom().catch(() => {});
+  }, []);
+
   const handleExportAllStories = useCallback(async () => {
     const storyCount = Object.keys(stories).length;
     if (storyCount === 0) {
@@ -534,9 +542,36 @@ function App() {
   // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
   const previewUrl = isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
+  useEffect(() => {
+    document.title = isSettingsWindow ? "Settings" : "Storywright";
+  }, []);
+
   if (isSettingsWindow) {
     return (
       <div className="settings-window-layout">
+        <div className="settings-window-titlebar">
+          <div className="settings-window-title">Settings</div>
+          <div className="settings-window-titlebar-actions">
+            <button
+              type="button"
+              className="settings-window-chrome-button"
+              aria-label="Expand settings window"
+              title="Expand settings window"
+              onClick={handleToggleCurrentWindowZoom}
+            >
+              <span className="settings-window-chrome-icon settings-window-chrome-icon-expand" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="settings-window-chrome-button settings-window-chrome-button-close"
+              aria-label="Close settings window"
+              title="Close settings window"
+              onClick={handleCloseCurrentWindow}
+            >
+              <span className="settings-window-chrome-icon settings-window-chrome-icon-close" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
         <div className="settings-window-body">
           <SettingsPanel
             requirements={environmentRequirements}

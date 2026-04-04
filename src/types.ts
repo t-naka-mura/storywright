@@ -140,6 +140,7 @@ export interface StorywrightAPI {
   getEnvironmentSourceStatus: () => Promise<EnvironmentSourceStatus>;
   openSettingsWindow: () => Promise<void>;
   closeCurrentWindow: () => Promise<void>;
+  toggleCurrentWindowZoom: () => Promise<void>;
   importEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;

@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("app:open-settings"),
   closeCurrentWindow: () =>
     ipcRenderer.invoke("app:close-current-window"),
+  toggleCurrentWindowZoom: () =>
+    ipcRenderer.invoke("app:toggle-current-window-zoom"),
   importEnvironmentFile: () =>
     ipcRenderer.invoke("environment:import-file"),
   saveLocalState: (key: "urlHistory" | "environment", data: unknown) =>

@@ -216,6 +216,7 @@ function openSettingsWindow() {
     minWidth: 760,
     minHeight: 560,
     title: "Settings",
+    titleBarStyle: "hidden",
     parent: mainWindow ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -226,6 +227,16 @@ function openSettingsWindow() {
   });
 
   loadWindowContents(settingsWindow, "#/settings");
+  if (process.platform === "darwin") {
+    settingsWindow.setWindowButtonVisibility(false);
+  }
+  settingsWindow.webContents.on("page-title-updated", (event: Electron.Event) => {
+    event.preventDefault();
+    settingsWindow?.setTitle("Settings");
+  });
+  settingsWindow.webContents.once("did-finish-load", () => {
+    settingsWindow?.setTitle("Settings");
+  });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
@@ -998,6 +1009,20 @@ function registerIpcHandlers() {
     }
 
     targetWindow.close();
+  });
+
+  ipcMain.handle("app:toggle-current-window-zoom", async (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      return;
+    }
+
+    if (targetWindow.isMaximized()) {
+      targetWindow.unmaximize();
+      return;
+    }
+
+    targetWindow.maximize();
   });
 
   ipcMain.handle("environment:import-file", async () => {

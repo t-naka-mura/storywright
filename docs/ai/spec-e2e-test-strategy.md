@@ -38,6 +38,7 @@ Storywright は React renderer だけでなく、Electron main process、WebCont
 
 - REC で新規 Story を録画し、その場で step が積み上がる
 - 録画完了後の Story をそのまま Run できる
+- 実録画した Story が再起動後に復元され、そのまま Run できる
 - 保存済み Story を選択して Run できる
 - navigate / click / assert の最小フローが pass する
 - step status が renderer に反映される
@@ -50,6 +51,7 @@ Storywright は React renderer だけでなく、Electron main process、WebCont
 - Settings window を別ウィンドウとして開ける
 - LOCAL_ENV を追加・編集できる
 - Hostname / Key / Value が autosave され、再起動後も復元される
+- 複数 LOCAL_ENV key を要求する Story で、不足時の案内と設定後の成功実行を確認する
 
 ## テストデータ方針
 
@@ -66,7 +68,6 @@ Storywright は React renderer だけでなく、Electron main process、WebCont
 
 ## 今後の拡張候補
 
-- REC 後に保存された StoryDocument の復元と再実行を、seed ではなく実録画起点で検証する
 - import / export の round-trip 検証
 - 環境変数不足エラーから Settings 導線へのフロー
 - 複数タブ / popup の実アプリ検証

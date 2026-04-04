@@ -1,6 +1,6 @@
 import { _electron as electron, type ElectronApplication, type Page } from "playwright";
 import { createServer, type Server } from "node:http";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -72,11 +72,12 @@ export async function createSeededUserDataDir(seed: SeedData = {}): Promise<stri
 export async function launchStorywright(seed: SeedData = {}, options: LaunchOptions = {}): Promise<LaunchSession> {
   const shouldCleanupUserDataDir = options.cleanupUserDataDir ?? !options.userDataDir;
   const userDataDir = options.userDataDir ?? await createSeededUserDataDir(seed);
+  const { ELECTRON_RUN_AS_NODE: _drop, ...cleanEnv } = process.env;
   const electronApp = await electron.launch({
     cwd: ROOT_DIR,
     args: [path.join(ROOT_DIR, "dist-electron/main.js")],
     env: {
-      ...process.env,
+      ...cleanEnv,
       STORYWRIGHT_USER_DATA_DIR: userDataDir,
       STORYWRIGHT_ENABLE_TEST_API: "1",
     },
@@ -113,6 +114,12 @@ export async function getActivePreviewUrl(page: Page) {
   });
 }
 
+export async function loadPreviewUrl(page: Page, url: string) {
+  await page.evaluate(async (nextUrl) => {
+    await window.storywright.loadPreviewUrl(nextUrl);
+  }, url);
+}
+
 export async function evaluateInPreview(page: Page, script: string) {
   return page.evaluate(async (source) => {
     return window.storywright.testEvaluatePreview?.(source) ?? null;
@@ -129,6 +136,115 @@ export async function clickInPreview(page: Page, selector: string) {
     target.click();
     return true;
   })()`);
+}
+
+export async function fillInPreview(page: Page, selector: string, value: string) {
+  const selectorLiteral = JSON.stringify(selector);
+  const valueLiteral = JSON.stringify(value);
+  await evaluateInPreview(page, `(() => {
+    const target = document.querySelector(${selectorLiteral});
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
+      throw new Error('Preview input not found: ' + ${selectorLiteral});
+    }
+    target.focus();
+    const prototype = target instanceof HTMLTextAreaElement
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    descriptor?.set?.call(target, ${valueLiteral});
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.blur();
+    return true;
+  })()`);
+}
+
+export async function selectInPreview(page: Page, selector: string, value: string) {
+  const selectorLiteral = JSON.stringify(selector);
+  const valueLiteral = JSON.stringify(value);
+  await evaluateInPreview(page, `(() => {
+    const target = document.querySelector(${selectorLiteral});
+    if (!(target instanceof HTMLSelectElement)) {
+      throw new Error('Preview select not found: ' + ${selectorLiteral});
+    }
+    target.value = ${valueLiteral};
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
+  })()`);
+}
+
+export async function clickInPreviewFrame(page: Page, frameSelector: string, selector: string) {
+  const frameLiteral = JSON.stringify(frameSelector);
+  const selectorLiteral = JSON.stringify(selector);
+  await evaluateInPreview(page, `(async () => {
+    function getTarget() {
+      const frame = document.querySelector(${frameLiteral});
+      if (!(frame instanceof HTMLIFrameElement) || !frame.contentDocument) {
+        return null;
+      }
+      return frame.contentDocument.querySelector(${selectorLiteral});
+    }
+    const start = Date.now();
+    while (Date.now() - start < 5000) {
+      const candidate = getTarget();
+      if (candidate && typeof candidate === 'object' && 'click' in candidate) {
+        candidate.click();
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    const target = getTarget();
+    if (!target || typeof target !== 'object' || !('click' in target)) {
+      throw new Error('Preview iframe element not found: ' + ${selectorLiteral});
+    }
+    target.click();
+    return true;
+  })()`);
+}
+
+export async function fillInPreviewFrame(page: Page, frameSelector: string, selector: string, value: string) {
+  const frameLiteral = JSON.stringify(frameSelector);
+  const selectorLiteral = JSON.stringify(selector);
+  const valueLiteral = JSON.stringify(value);
+  await evaluateInPreview(page, `(async () => {
+    function getTarget() {
+      const frame = document.querySelector(${frameLiteral});
+      if (!(frame instanceof HTMLIFrameElement) || !frame.contentDocument) {
+        return null;
+      }
+      return frame.contentDocument.querySelector(${selectorLiteral});
+    }
+    const start = Date.now();
+    let target = null;
+    while (Date.now() - start < 5000) {
+      const candidate = getTarget();
+      if (candidate && typeof candidate === 'object' && 'focus' in candidate && 'blur' in candidate && 'dispatchEvent' in candidate) {
+        target = candidate;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (!target || typeof target !== 'object' || !('ownerDocument' in target)) {
+      throw new Error('Preview iframe input not found: ' + ${selectorLiteral});
+    }
+    target.focus();
+    const frameWindow = target.ownerDocument?.defaultView;
+    const isTextarea = (target.tagName || '').toLowerCase() === 'textarea';
+    const prototype = isTextarea
+      ? frameWindow?.HTMLTextAreaElement?.prototype
+      : frameWindow?.HTMLInputElement?.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    descriptor?.set?.call(target, ${valueLiteral});
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    target.dispatchEvent(new Event('change', { bubbles: true }));
+    target.blur();
+    return true;
+  })()`);
+}
+
+export async function readUserDataJson<T>(userDataDir: string, filename: string): Promise<T> {
+  const content = await readFile(path.join(userDataDir, 'data', filename), 'utf8');
+  return JSON.parse(content) as T;
 }
 
 export async function persistStories(page: Page, stories: PersistedStory[]) {
@@ -175,6 +291,103 @@ export async function startFixtureSite(): Promise<FixtureServer> {
             <main>
               <h1>Fixture Home</h1>
               <a href="/item" id="go-item">商品ページへ</a>
+              <a href="/account" id="go-account">アカウント設定へ</a>
+              <a href="/checkout-iframe" id="go-checkout-iframe">埋め込み決済へ</a>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/account") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Account Setup</h1>
+              <label for="username">Username</label>
+              <input id="username" name="username" autocomplete="off" />
+              <label for="password">Password</label>
+              <input id="password" name="password" type="password" autocomplete="off" />
+              <label for="role">Role</label>
+              <select id="role" name="role">
+                <option value="">Choose role</option>
+                <option value="admin">admin</option>
+                <option value="editor">editor</option>
+              </select>
+              <button id="submit-account">送信</button>
+              <script>
+                document.getElementById('submit-account').addEventListener('click', () => {
+                  const user = document.getElementById('username').value;
+                  const role = document.getElementById('role').value;
+                  const params = new URLSearchParams({ user, role });
+                  window.location.href = '/account/confirm?' + params.toString();
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl.startsWith("/account/confirm")) {
+      const url = new URL(requestUrl, 'http://127.0.0.1');
+      const user = url.searchParams.get('user') ?? '';
+      const role = url.searchParams.get('role') ?? '';
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1 id="account-status">設定完了</h1>
+              <p id="submitted-user">${user}</p>
+              <p id="submitted-role">${role}</p>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/checkout-iframe") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Checkout</h1>
+              <p id="payment-status">未ログイン</p>
+              <iframe id="paypal-frame" src="/embedded-paypal" title="Embedded PayPal"></iframe>
+              <script>
+                window.addEventListener('message', (event) => {
+                  if (!event.data || event.data.type !== 'paypal-login-success') return;
+                  document.getElementById('payment-status').textContent = 'PayPal logged in as ' + event.data.email;
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/embedded-paypal") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>PayPal Login</h1>
+              <label for="paypal-email">Email</label>
+              <input id="paypal-email" type="email" autocomplete="off" />
+              <label for="paypal-password">Password</label>
+              <input id="paypal-password" type="password" autocomplete="off" />
+              <button id="paypal-submit">Log in</button>
+              <script>
+                document.getElementById('paypal-submit').addEventListener('click', () => {
+                  const email = document.getElementById('paypal-email').value;
+                  window.parent.postMessage({ type: 'paypal-login-success', email }, '*');
+                });
+              </script>
             </main>
           </body>
         </html>`);

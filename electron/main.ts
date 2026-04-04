@@ -1287,21 +1287,48 @@ function registerIpcHandlers() {
   window.__storywrightExecutor = true;
 
   function resolveSelector(selector) {
+    function getSearchDocuments() {
+      var documents = [];
+      var seen = new Set();
+
+      function visit(doc) {
+        if (!doc || seen.has(doc)) return;
+        seen.add(doc);
+        documents.push(doc);
+
+        var frames = doc.querySelectorAll('iframe, frame');
+        for (var i = 0; i < frames.length; i++) {
+          try {
+            var childDoc = frames[i].contentDocument;
+            if (childDoc) visit(childDoc);
+          } catch (e) {
+            // cross-origin frame は探索できない
+          }
+        }
+      }
+
+      visit(document);
+      return documents;
+    }
+
     // text="..." — テキスト内容で検索
     var textMatch = selector.match(/^text="(.+)"$/);
     if (textMatch) {
       var text = textMatch[1];
-      var candidates = document.querySelectorAll('button, a, [role="button"], [role="link"]');
-      for (var i = 0; i < candidates.length; i++) {
-        if (candidates[i].textContent && candidates[i].textContent.trim() === text) {
-          return candidates[i];
+      var docs = getSearchDocuments();
+      for (var docIndex = 0; docIndex < docs.length; docIndex++) {
+        var candidates = docs[docIndex].querySelectorAll('button, a, [role="button"], [role="link"]');
+        for (var i = 0; i < candidates.length; i++) {
+          if (candidates[i].textContent && candidates[i].textContent.trim() === text) {
+            return candidates[i];
+          }
         }
-      }
-      // フォールバック: 全要素から検索
-      var all = document.querySelectorAll('*');
-      for (var j = 0; j < all.length; j++) {
-        if (all[j].childElementCount === 0 && all[j].textContent && all[j].textContent.trim() === text) {
-          return all[j];
+
+        var all = docs[docIndex].querySelectorAll('*');
+        for (var j = 0; j < all.length; j++) {
+          if (all[j].childElementCount === 0 && all[j].textContent && all[j].textContent.trim() === text) {
+            return all[j];
+          }
         }
       }
       return null;
@@ -1312,10 +1339,13 @@ function registerIpcHandlers() {
     if (roleMatch) {
       var role = roleMatch[1];
       var name = roleMatch[2];
-      var roleEls = document.querySelectorAll('[role="' + role + '"], ' + role);
-      for (var k = 0; k < roleEls.length; k++) {
-        var ariaLabel = roleEls[k].getAttribute('aria-label') || roleEls[k].textContent?.trim();
-        if (ariaLabel === name) return roleEls[k];
+      var roleDocs = getSearchDocuments();
+      for (var roleDocIndex = 0; roleDocIndex < roleDocs.length; roleDocIndex++) {
+        var roleEls = roleDocs[roleDocIndex].querySelectorAll('[role="' + role + '"], ' + role);
+        for (var k = 0; k < roleEls.length; k++) {
+          var ariaLabel = roleEls[k].getAttribute('aria-label') || roleEls[k].textContent?.trim();
+          if (ariaLabel === name) return roleEls[k];
+        }
       }
       return null;
     }
@@ -1325,17 +1355,18 @@ function registerIpcHandlers() {
     if (labelMatch) {
       var labelText = labelMatch[1];
       var childTag = labelMatch[2];
-      var labels = document.querySelectorAll('label');
-      for (var l = 0; l < labels.length; l++) {
-        if (labels[l].textContent && labels[l].textContent.includes(labelText)) {
-          // label 内の子要素
-          var child = labels[l].querySelector(childTag);
-          if (child) return child;
-          // label[for] で関連付けられた要素
-          var forId = labels[l].getAttribute('for');
-          if (forId) {
-            var target = document.getElementById(forId);
-            if (target && target.tagName.toLowerCase() === childTag) return target;
+      var labelDocs = getSearchDocuments();
+      for (var labelDocIndex = 0; labelDocIndex < labelDocs.length; labelDocIndex++) {
+        var labels = labelDocs[labelDocIndex].querySelectorAll('label');
+        for (var l = 0; l < labels.length; l++) {
+          if (labels[l].textContent && labels[l].textContent.includes(labelText)) {
+            var child = labels[l].querySelector(childTag);
+            if (child) return child;
+            var forId = labels[l].getAttribute('for');
+            if (forId) {
+              var target = labelDocs[labelDocIndex].getElementById(forId);
+              if (target && target.tagName.toLowerCase() === childTag) return target;
+            }
           }
         }
       }
@@ -1344,7 +1375,12 @@ function registerIpcHandlers() {
 
     // CSS セレクタ（#id, [data-testid="..."], [placeholder="..."], etc.）
     try {
-      return document.querySelector(selector);
+      var cssDocs = getSearchDocuments();
+      for (var cssDocIndex = 0; cssDocIndex < cssDocs.length; cssDocIndex++) {
+        var match = cssDocs[cssDocIndex].querySelector(selector);
+        if (match) return match;
+      }
+      return null;
     } catch(e) {
       return null;
     }
@@ -1423,10 +1459,11 @@ function registerIpcHandlers() {
         input.scrollIntoView({ block: 'center' });
         input.focus();
         // 既存値をクリアしてから入力
+        var inputWindow = input.ownerDocument && input.ownerDocument.defaultView ? input.ownerDocument.defaultView : window;
         var nativeSetter = Object.getOwnPropertyDescriptor(
-          window.HTMLInputElement.prototype, 'value'
+          inputWindow.HTMLInputElement.prototype, 'value'
         )?.set || Object.getOwnPropertyDescriptor(
-          window.HTMLTextAreaElement.prototype, 'value'
+          inputWindow.HTMLTextAreaElement.prototype, 'value'
         )?.set;
         if (nativeSetter) {
           nativeSetter.call(input, step.value);

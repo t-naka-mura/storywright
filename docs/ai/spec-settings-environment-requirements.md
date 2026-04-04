@@ -2,7 +2,7 @@
 
 ## 概要
 
-ADR-018 に基づき、Storywright に `Settings` surface を追加する。
+ADR-016 に基づき、Storywright に `Settings` surface を追加する。
 
 この画面の初期目的は、Story 群で参照されている `{{ENV.*}}` 変数を一覧化し、現在の環境で `available` / `missing` を判定して表示すること。
 
@@ -12,7 +12,7 @@ ADR-018 に基づき、Storywright に `Settings` surface を追加する。
 
 - ADR-016: `{{ENV.NAME}}` の実行時解決を導入した
 - ADR-017: portable Story と local-only data / secret を分離した
-- ADR-018: 環境 requirements を扱う独立した `Settings` surface を設ける方針を決めた
+- Settings surface の整理は ADR-016 に統合した
 
 現在の課題は、必要変数の発見が実行時エラー頼みであり、事前確認 UI がないこと。
 
@@ -184,6 +184,6 @@ Phase 1 では次の 1 セクションのみを持つ。
 ## 関連ドキュメント
 
 - [ADR-016](adr/ADR-016-environment-variable-support.md)
-- [ADR-017](adr/ADR-017-portable-story-storage-and-import-export.md)
-- [ADR-018](adr/ADR-018-settings-surface-for-environment-requirements.md)
+- [ADR-017](adr/archive/ADR-017-portable-story-storage-and-import-export.md)
+- [ADR-018 archive](adr/archive/ADR-018-settings-surface-for-environment-requirements.md)
 - [design-philosophy.md](design-philosophy.md)

@@ -96,6 +96,18 @@ ADR-016 以前の実装で、`sensitive` フラグによるパスワード等の
 
 ## 実装方針
 
+### ADR-018 の統合
+
+Settings surface の扱いは、独立 ADR ではなく本 ADR の継続実装として扱う。
+
+- `ENV.*` の requirement 可視化
+- `available` / `missing` 診断
+- Settings への導線
+- domain ごとの local key/value 管理
+- `.env` の import 導線
+
+独立した Settings surface 案の検討履歴は `docs/ai/adr/archive/ADR-018-settings-surface-for-environment-requirements.md` に退避し、今後の仕様整理は ADR-016 を正本として進める。
+
 ### ADR-017 との関係
 
 ADR-017 は Story の保存境界と export/import の責務を定義する ADR であり、ADR-016 と競合しない。

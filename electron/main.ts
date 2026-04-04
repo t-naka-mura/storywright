@@ -7,6 +7,13 @@ const { parse: parseDotenv } = require("dotenv");
 const path = require("path");
 const fs = require("fs");
 
+const TEST_USER_DATA_DIR = process.env.STORYWRIGHT_USER_DATA_DIR;
+const TEST_API_ENABLED = process.env.STORYWRIGHT_ENABLE_TEST_API === "1";
+
+if (TEST_USER_DATA_DIR) {
+  app.setPath("userData", TEST_USER_DATA_DIR);
+}
+
 const STORIES_FILENAME = "stories.json";
 const STORY_SECRETS_FILENAME = "storySecrets.json";
 const LOCAL_STATE_FILENAMES = {
@@ -191,6 +198,29 @@ function loadWindowContents(targetWindow: Electron.BrowserWindow, hash = "") {
   targetWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
     hash: hash.replace(/^#/, ""),
   });
+}
+
+async function waitForWebContentsReady(wc: Electron.WebContents, timeoutMs = 5000): Promise<void> {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
+        expression: "document.readyState",
+        returnByValue: true,
+      }) as { result?: { value?: string } };
+
+      if (evalResult.result?.value === "interactive" || evalResult.result?.value === "complete") {
+        return;
+      }
+    } catch {
+      // context not ready yet
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  throw new Error("Timed out waiting for page context");
 }
 
 function focusMainWindow() {
@@ -719,6 +749,11 @@ const RECORDER_INJECTION_SCRIPT = `
     return ':nth-child(' + (Array.from(el.parentElement.children).indexOf(el) + 1) + ')';
   }
 
+  function getInteractiveClickTarget(el) {
+    if (!el || !el.closest) return el;
+    return el.closest('a[href], button, input, select, textarea, summary, label, [role="button"], [role="link"], [onclick]') || el;
+  }
+
   function generateSelector(el) {
     // 1. data-testid
     if (el.dataset && el.dataset.testid) {
@@ -849,7 +884,7 @@ const RECORDER_INJECTION_SCRIPT = `
   // click capture (アサートモードでない時のみ)
   document.addEventListener('click', function(e) {
     if (window.__storywrightAssertMode) return;
-    var target = e.target;
+    var target = getInteractiveClickTarget(e.target);
     if (!target || !target.tagName) return;
     sendStep({
       action: 'click',
@@ -1197,6 +1232,21 @@ function registerIpcHandlers() {
     getActivePreviewContents()?.reload();
   });
 
+  if (TEST_API_ENABLED) {
+    ipcMain.handle("test:get-preview-bounds", async () => ({ ...previewBounds }));
+    ipcMain.handle("test:open-settings", async () => {
+      openSettingsWindow();
+    });
+    ipcMain.handle("test:evaluate-preview", async (_event, script: string) => {
+      const wc = getActivePreviewContents();
+      if (!wc) {
+        throw new Error("Active preview が見つかりません。");
+      }
+      await waitForWebContentsReady(wc);
+      return wc.executeJavaScript(script);
+    });
+  }
+
   ipcMain.handle("start-recording", async () => {
     const allWc = getAllPreviewContents();
     if (allWc.length === 0) {
@@ -1314,6 +1364,11 @@ function registerIpcHandlers() {
     });
   }
 
+  function getInteractiveClickTarget(el) {
+    if (!el || !el.closest) return el;
+    return el.closest('a[href], button, input, select, textarea, summary, label, [role="button"], [role="link"], [onclick]') || el;
+  }
+
   // DOM 安定待機: MutationObserver で変更を監視し、
   // quietMs の間変更がなければ「安定した」と判断する
   function waitForDomSettle(timeoutMs, quietMs) {
@@ -1354,9 +1409,13 @@ function registerIpcHandlers() {
     switch (step.action) {
       case 'click': {
         var el = await waitForElement(step.target, timeout);
-        el.scrollIntoView({ block: 'center' });
-        el.click();
-        await waitForDomSettle();
+        var clickTarget = getInteractiveClickTarget(el);
+        clickTarget.scrollIntoView({ block: 'center' });
+        var navigates = clickTarget.tagName === 'A' && !!clickTarget.getAttribute('href');
+        clickTarget.click();
+        if (!navigates) {
+          await waitForDomSettle();
+        }
         return { status: 'passed' };
       }
       case 'type': {
@@ -1502,20 +1561,9 @@ function registerIpcHandlers() {
           try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
           await wc.debugger.sendCommand("Page.enable");
           await wc.debugger.sendCommand("Runtime.enable");
-          wc.debugger.sendCommand("Page.navigate", { url });
+          await wc.debugger.sendCommand("Page.navigate", { url });
           // JS コンテキストが使えるようになるまでポーリング（CDP経由）
-          for (let attempt = 0; attempt < 50; attempt++) {
-            try {
-              const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
-                expression: "document.readyState",
-                returnByValue: true,
-              }) as { result?: { value?: string } };
-              if (evalResult.result?.value === "interactive" || evalResult.result?.value === "complete") {
-                break;
-              }
-            } catch { /* context not ready */ }
-            await new Promise((r) => setTimeout(r, 100));
-          }
+          await waitForWebContentsReady(wc);
           await wc.debugger.sendCommand("Runtime.evaluate", {
             expression: EXECUTOR_INJECTION_SCRIPT,
             returnByValue: true,
@@ -1529,16 +1577,50 @@ function registerIpcHandlers() {
             expression: EXECUTOR_INJECTION_SCRIPT,
             returnByValue: true,
           });
-          const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
-            expression: `window.__storywrightExecuteStep(${JSON.stringify(resolvedStep)})`,
-            returnByValue: true,
-            awaitPromise: true,
-          }) as { result?: { value?: { status?: string; error?: string } }; exceptionDetails?: { text?: string } };
+          let evalResult: { result?: { value?: { status?: string; error?: string } }; exceptionDetails?: { text?: string } };
+          try {
+            evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
+              expression: `window.__storywrightExecuteStep(${JSON.stringify(resolvedStep)})`,
+              returnByValue: true,
+              awaitPromise: true,
+            }) as { result?: { value?: { status?: string; error?: string } }; exceptionDetails?: { text?: string } };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const navigationTriggeredContextReset =
+              resolvedStep.action === "click" &&
+              /Execution context was destroyed/i.test(errorMessage);
+
+            if (!navigationTriggeredContextReset) {
+              throw error;
+            }
+
+            await waitForWebContentsReady(wc);
+            await wc.debugger.sendCommand("Runtime.evaluate", {
+              expression: EXECUTOR_INJECTION_SCRIPT,
+              returnByValue: true,
+            });
+            currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+            evalResult = { result: { value: { status: "passed" } } };
+          }
           if (evalResult.exceptionDetails) {
-            throw new Error(evalResult.exceptionDetails.text || "Step execution failed");
+            const exceptionText = evalResult.exceptionDetails.text || "Step execution failed";
+            const navigationTriggeredContextReset =
+              resolvedStep.action === "click" &&
+              /Execution context was destroyed/i.test(exceptionText);
+
+            if (navigationTriggeredContextReset) {
+              await waitForWebContentsReady(wc);
+              await wc.debugger.sendCommand("Runtime.evaluate", {
+                expression: EXECUTOR_INJECTION_SCRIPT,
+                returnByValue: true,
+              });
+              currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+            } else {
+              throw new Error(exceptionText);
+            }
           }
           const result = evalResult.result?.value;
-          if (!result || result.status !== "passed") {
+          if (evalResult.exceptionDetails == null && (!result || result.status !== "passed")) {
             throw new Error(result?.error || "Step failed");
           }
           currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;

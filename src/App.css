@@ -1211,6 +1211,12 @@ body,
   display: flex;
 }
 
+.webview-bounds-proxy {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .webview-container webview {
   position: absolute;
   top: 0;
@@ -1283,6 +1289,7 @@ body,
   cursor: pointer;
   transition: background 0.15s;
   flex-shrink: 0;
+  margin-top: 0;
 }
 
 .browser-bar-btn:hover:not(:disabled) {
@@ -1304,7 +1311,8 @@ body,
   position: relative;
   min-width: 0;
   border-radius: 16px;
-  overflow: hidden;
+  overflow: visible;
+  z-index: 30;
 }
 
 .browser-bar-url-input {

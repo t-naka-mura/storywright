@@ -85,4 +85,7 @@ contextBridge.exposeInMainWorld("storywright", {
       ipcRenderer.removeListener("new-tab", listener);
     };
   },
+  testGetPreviewBounds: () => ipcRenderer.invoke("test:get-preview-bounds"),
+  testOpenSettings: () => ipcRenderer.invoke("test:open-settings"),
+  testEvaluatePreview: (script: string) => ipcRenderer.invoke("test:evaluate-preview", script),
 });

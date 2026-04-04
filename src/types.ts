@@ -164,6 +164,9 @@ export interface StorywrightAPI {
   previewReload: () => Promise<void>;
   onPreviewState: (callback: (state: PreviewState) => void) => () => void;
   onNewTab: (callback: (url: string) => void) => () => void;
+  testGetPreviewBounds?: () => Promise<PreviewBounds>;
+  testOpenSettings?: () => Promise<void>;
+  testEvaluatePreview?: (script: string) => Promise<unknown>;
 }
 
 declare global {

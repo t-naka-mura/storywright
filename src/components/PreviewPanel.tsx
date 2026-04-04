@@ -32,13 +32,21 @@ export function PreviewPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
   const urlBarRef = useRef<HTMLDivElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const lastLoadedUrlRef = useRef<string>("");
   const lastAppliedExternalUrlRef = useRef<string | null>(null);
+  const isEditingRef = useRef(false);
 
   const activeTab: PreviewTabState | null =
     previewState.tabs.find((tab) => tab.id === previewState.activeTabId) ?? null;
   const hasActiveUrl = !!activeTab?.url;
+  const isDropdownVisible = showUrlDropdown && urlHistory.length > 0;
+  const dropdownOffset = isDropdownVisible
+    ? Math.min(urlHistory.length * 34 + 6, 206)
+    : 0;
+
+  const isInputActive = () => isEditingRef.current || document.activeElement === urlInputRef.current;
 
   useEffect(() => {
     const unsubscribe = window.storywright.onPreviewState((state) => {
@@ -60,9 +68,9 @@ export function PreviewPanel({
       const rect = node.getBoundingClientRect();
       window.storywright.setPreviewBounds({
         x: rect.x,
-        y: rect.y,
+        y: rect.y + dropdownOffset,
         width: rect.width,
-        height: rect.height,
+        height: Math.max(0, rect.height - dropdownOffset),
       }).catch(() => {});
     };
 
@@ -82,10 +90,10 @@ export function PreviewPanel({
       observer.disconnect();
       window.removeEventListener("resize", syncBounds);
     };
-  }, []);
+  }, [dropdownOffset]);
 
   useEffect(() => {
-    if (!isEditing) {
+    if (!isInputActive()) {
       setBarUrl(activeTab?.url || url);
     }
   }, [activeTab?.id, activeTab?.url, url, isEditing]);
@@ -101,7 +109,7 @@ export function PreviewPanel({
   }, [previewState.activeTabId]);
 
   useEffect(() => {
-    if (!url || !/^https?:\/\//.test(url) || isEditing) return;
+    if (!url || !/^https?:\/\//.test(url) || isInputActive()) return;
     if (!previewState.activeTabId) {
       if (previewState.tabs.length > 0) return;
       if (pendingInitialPreviewUrl === url) return;
@@ -175,6 +183,7 @@ export function PreviewPanel({
   }, []);
 
   const handleUrlSubmit = useCallback(() => {
+    isEditingRef.current = false;
     setIsEditing(false);
     setShowUrlDropdown(false);
     if (!barUrl || !/^https?:\/\//.test(barUrl)) return;
@@ -185,6 +194,7 @@ export function PreviewPanel({
   const handleUrlSelect = useCallback(
     (selectedUrl: string) => {
       setBarUrl(selectedUrl);
+      isEditingRef.current = false;
       setIsEditing(false);
       setShowUrlDropdown(false);
       onUrlChange(selectedUrl);
@@ -290,20 +300,27 @@ export function PreviewPanel({
         </button>
         <div className="browser-bar-url-area" ref={urlBarRef}>
           <input
+            ref={urlInputRef}
             className="browser-bar-url-input"
             value={barUrl}
             disabled={isRunning}
             onChange={(e) => {
+              isEditingRef.current = true;
               setBarUrl(e.target.value);
               setIsEditing(true);
               setShowUrlDropdown(true);
             }}
             onFocus={() => {
+              isEditingRef.current = true;
               setIsEditing(true);
               setShowUrlDropdown(true);
             }}
             onBlur={() => {
-              setTimeout(() => setIsEditing(false), 200);
+              setTimeout(() => {
+                if (document.activeElement === urlInputRef.current) return;
+                isEditingRef.current = false;
+                setIsEditing(false);
+              }, 200);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleUrlSubmit();
@@ -354,9 +371,10 @@ export function PreviewPanel({
         </div>
       )}
 
-      <div className="webview-container" ref={previewContainerRef}>
+      <div className="webview-container">
+        <div ref={previewContainerRef} className="webview-bounds-proxy" />
         {!hasActiveUrl && (
-          <div className="preview-empty">
+          <div className="preview-empty" style={dropdownOffset > 0 ? { paddingTop: `${dropdownOffset}px` } : undefined}>
             <p className="preview-empty-icon">🌐</p>
             <p className="preview-empty-text">
               上のアドレスバーにサイトの URL を入力してください

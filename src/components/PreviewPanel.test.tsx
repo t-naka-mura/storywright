@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewPanel } from "./PreviewPanel";
 import type { PreviewState, RepeatResult, StoryResult, StorywrightAPI } from "../types";
@@ -99,5 +99,59 @@ describe("PreviewPanel", () => {
       expect(window.storywright.createPreviewTab).toHaveBeenCalledTimes(1);
     });
     expect(window.storywright.createPreviewTab).toHaveBeenCalledWith("https://example.com");
+  });
+
+  it("URL 入力に focus すると履歴候補を表示する", async () => {
+    render(
+      <PreviewPanel
+        url="https://example.com"
+        isRecording={false}
+        isRunning={false}
+        recordedStepCount={0}
+        onUrlChange={vi.fn()}
+        urlHistory={["https://tn202204.base0.info", "https://admin.stgthebase.com"]}
+        onDeleteUrlHistory={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("https://example.com");
+    fireEvent.focus(input);
+
+    expect(await screen.findByRole("button", { name: "https://tn202204.base0.info" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "https://admin.stgthebase.com" })).toBeInTheDocument();
+  });
+
+  it("入力中は外部 URL 更新で入力値を巻き戻さない", async () => {
+    const { rerender } = render(
+      <PreviewPanel
+        url="https://tn202204.base0.info"
+        isRecording={false}
+        isRunning={false}
+        recordedStepCount={0}
+        onUrlChange={vi.fn()}
+        urlHistory={[]}
+        onDeleteUrlHistory={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText("https://example.com") as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "https://tn202204.base0.info/items" } });
+
+    await act(async () => {
+      rerender(
+        <PreviewPanel
+          url="https://tn202204.base0.info"
+          isRecording={false}
+          isRunning={false}
+          recordedStepCount={0}
+          onUrlChange={vi.fn()}
+          urlHistory={[]}
+          onDeleteUrlHistory={vi.fn()}
+        />,
+      );
+    });
+
+    expect(input.value).toBe("https://tn202204.base0.info/items");
   });
 });

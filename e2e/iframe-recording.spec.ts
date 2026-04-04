@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickInPreview, clickInPreviewFrame, fillInPreviewFrame, getActivePreviewUrl, launchStorywright, loadPreviewUrl, startFixtureSite } from "./helpers/app";
+import { clickInPreview, clickInPreviewFrame, fillInPreviewFrame, getActivePreviewUrl, launchStorywright, loadPreviewUrl, startFixtureSite, waitForRecordedStepCount } from "./helpers/app";
 
 test("iframe-embedded checkout can be recorded and replayed as a story", async () => {
   const fixtureSite = await startFixtureSite();
@@ -25,7 +25,7 @@ test("iframe-embedded checkout can be recorded and replayed as a story", async (
 
     await mainWindow.getByRole("button", { name: /Assert/ }).click();
     await clickInPreview(mainWindow, "#payment-status");
-    await expect(mainWindow.getByText(/7 ステップ記録済み/)).toBeVisible();
+    await waitForRecordedStepCount(mainWindow, 7);
 
     await mainWindow.getByRole("button", { name: /Stop/ }).click();
     await expect(mainWindow.locator(".step-item")).toHaveCount(7);

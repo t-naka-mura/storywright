@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { clickInPreview, fillInPreview, getActivePreviewUrl, launchStorywright, loadPreviewUrl, readUserDataJson, selectInPreview, startFixtureSite } from "./helpers/app";
+import { clickInPreview, fillInPreview, getActivePreviewUrl, launchStorywright, loadPreviewUrl, readUserDataJson, selectInPreview, startFixtureSite, waitForRecordedStepCount } from "./helpers/app";
 
 test("recorded stories survive relaunch and sensitive values stay out of stories.json", async () => {
   const fixtureSite = await startFixtureSite();
@@ -30,7 +30,7 @@ test("recorded stories survive relaunch and sensitive values stay out of stories
     await clickInPreview(mainWindow, "#submitted-role");
     await mainWindow.getByRole("button", { name: /Assert/ }).click();
     await clickInPreview(mainWindow, "#submitted-user");
-    await expect(mainWindow.getByText(/10 ステップ記録済み/)).toBeVisible();
+    await waitForRecordedStepCount(mainWindow, 10);
 
     await mainWindow.getByRole("button", { name: /Stop/ }).click();
     await expect(mainWindow.locator(".step-item")).toHaveCount(10);

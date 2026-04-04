@@ -1,4 +1,5 @@
 import { _electron as electron, type ElectronApplication, type Page } from "playwright";
+import { expect } from "@playwright/test";
 import { createServer, type Server } from "node:http";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -258,6 +259,14 @@ export async function persistStories(page: Page, stories: PersistedStory[]) {
   }, stories);
 }
 
+export async function waitForRecordedStepCount(page: Page, count: number) {
+  await expect.poll(async () => {
+    const text = await page.locator(".preview-recording-badge").textContent();
+    const match = text?.match(/(\d+) ステップ記録済み/);
+    return match ? Number(match[1]) : -1;
+  }, { timeout: 15000 }).toBeGreaterThanOrEqual(count);
+}
+
 export async function openSettingsWindow(electronApp: ElectronApplication, page: Page) {
   const settingsWindowPromise = electronApp.waitForEvent("window", {
     predicate: async (candidate) => {
@@ -292,6 +301,7 @@ export async function startFixtureSite(): Promise<FixtureServer> {
               <h1>Fixture Home</h1>
               <a href="/item" id="go-item">商品ページへ</a>
               <a href="/account" id="go-account">アカウント設定へ</a>
+              <a href="/login" id="go-login">ログインへ</a>
               <a href="/checkout-iframe" id="go-checkout-iframe">埋め込み決済へ</a>
             </main>
           </body>
@@ -387,6 +397,43 @@ export async function startFixtureSite(): Promise<FixtureServer> {
                   const email = document.getElementById('paypal-email').value;
                   window.parent.postMessage({ type: 'paypal-login-success', email }, '*');
                 });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/login") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Login</h1>
+              <button id="do-login">ログインする</button>
+              <script>
+                document.getElementById('do-login').addEventListener('click', () => {
+                  localStorage.setItem('loggedIn', 'true');
+                  window.location.href = '/dashboard';
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/dashboard") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1 id="login-status">Loading...</h1>
+              <script>
+                var isLoggedIn = localStorage.getItem('loggedIn') === 'true';
+                document.getElementById('login-status').textContent = isLoggedIn ? 'ログイン済み' : '未ログイン';
               </script>
             </main>
           </body>

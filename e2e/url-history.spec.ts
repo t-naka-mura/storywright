@@ -1,12 +1,13 @@
 import { test, expect } from "@playwright/test";
-import { getPreviewBounds, launchStorywright } from "./helpers/app";
+import { getPreviewBounds, launchStorywright, loadPreviewUrl, getActivePreviewUrl, startFixtureSite } from "./helpers/app";
 
 test("URL history dropdown stays visible and pushes native preview bounds", async () => {
+  const fixtureSite = await startFixtureSite();
   const session = await launchStorywright({
     urlHistory: {
-      lastBaseUrl: "https://tn202204.base0.info",
+      lastBaseUrl: fixtureSite.origin,
       history: [
-        "https://tn202204.base0.info",
+        fixtureSite.origin,
         "https://admin.stgthebase.com",
         "https://example.com",
       ],
@@ -17,7 +18,9 @@ test("URL history dropdown stays visible and pushes native preview bounds", asyn
     const { mainWindow } = session;
     const input = mainWindow.getByPlaceholder("https://example.com");
 
-    await expect(input).toHaveValue("https://tn202204.base0.info");
+    // プレビューが seed した URL をロード完了するまで待つ
+    await loadPreviewUrl(mainWindow, fixtureSite.origin);
+    await expect.poll(async () => await getActivePreviewUrl(mainWindow)).toContain(fixtureSite.origin);
 
     await mainWindow.waitForFunction(async () => {
       const bounds = await window.storywright.testGetPreviewBounds?.();
@@ -27,7 +30,7 @@ test("URL history dropdown stays visible and pushes native preview bounds", asyn
     const beforeBounds = await getPreviewBounds(mainWindow);
     await input.click();
 
-    await expect(mainWindow.getByRole("button", { name: "https://tn202204.base0.info" })).toBeVisible();
+    await expect(mainWindow.getByRole("button", { name: fixtureSite.origin })).toBeVisible();
     const afterBounds = await getPreviewBounds(mainWindow);
 
     expect(beforeBounds).not.toBeNull();
@@ -36,5 +39,6 @@ test("URL history dropdown stays visible and pushes native preview bounds", asyn
     expect(afterBounds!.height).toBeLessThan(beforeBounds!.height);
   } finally {
     await session.close();
+    await fixtureSite.close();
   }
 });

@@ -109,7 +109,21 @@ test("recorded stories can be parameterized with multiple LOCAL_ENV keys and the
       await settingsWindow.locator('input[aria-label="Environment key 4"]').fill("ROLE");
       await settingsWindow.locator('input[aria-label="Environment value 4"]').fill("admin");
 
-      await settingsWindow.waitForTimeout(500);
+      // autosave (250ms debounce) + IPC 保存が完了するまでポーリングで待つ
+      await expect.poll(async () => {
+        try {
+          const presence = await restoredWindow.evaluate(async () => {
+            return window.storywright.getEnvironmentVariablePresence(
+              ["ORIGIN", "USERNAME", "PASSWORD", "ROLE"],
+              "http://127.0.0.1",
+            );
+          });
+          return Object.values(presence as Record<string, boolean>).every(Boolean);
+        } catch {
+          return false;
+        }
+      }, { timeout: 10000 }).toBe(true);
+
       await restoredWindow.getByRole("button", { name: "閉じる", exact: true }).click();
       const expectedStepCount = await restoredWindow.locator(".step-item").count();
       await restoredWindow.getByRole("button", { name: /Run/ }).click();

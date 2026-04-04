@@ -2,7 +2,7 @@
 
 ## 概要
 
-ADR-016 に基づき、Storywright に `Settings` surface を追加する。
+archive 済みの ADR-016 に基づき、Storywright に `Settings` surface を追加する。
 
 この画面の初期目的は、Story 群で参照されている `{{ENV.*}}` 変数を一覧化し、現在の環境で `available` / `missing` を判定して表示すること。
 
@@ -165,9 +165,12 @@ Phase 1 では次の 1 セクションのみを持つ。
 
 ### 現在の追加実装
 
-- ordered な `.env` ファイルパス群を 1 行 1 path で保存できる
-- 後ろの file ほど優先される
+- active domain の key/value を行単位で直接編集できる
+- active domain の追加、削除、並び替えができる
+- `.env` を active domain に取り込み、そのまま行単位編集へ移れる
 - Settings 上で source status と利用可能変数数を確認できる
+- values の検索と未保存変更表示がある
+- requirement / story 名で environment requirements を検索できる
 
 ### Phase 3 候補
 
@@ -183,7 +186,7 @@ Phase 1 では次の 1 セクションのみを持つ。
 
 ## 関連ドキュメント
 
-- [ADR-016](adr/ADR-016-environment-variable-support.md)
+- [ADR-016 archive](adr/archive/ADR-016-environment-variable-support.md)
 - [ADR-017](adr/archive/ADR-017-portable-story-storage-and-import-export.md)
 - [ADR-018 archive](adr/archive/ADR-018-settings-surface-for-environment-requirements.md)
 - [design-philosophy.md](design-philosophy.md)

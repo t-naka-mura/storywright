@@ -1,36 +1,93 @@
 import { useEffect, useState } from "react";
-import type { EnvironmentSettings, EnvironmentSourceStatus, ImportedEnvironmentValues } from "../types";
+import type {
+  EnvironmentDomain,
+  EnvironmentSettings,
+  EnvironmentSourceStatus,
+  ImportedEnvironmentValues,
+} from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
 function getEnvironmentDomains(settings: EnvironmentSettings) {
   return settings.domains ?? [];
 }
 
-function toEnvironmentValuesDraft(values: Array<{ key: string; value: string }> | undefined): string {
-  return (values ?? [])
-    .slice()
-    .sort((left, right) => left.key.localeCompare(right.key))
-    .map(({ key, value }) => `${key}=${value}`)
-    .join("\n");
+type EnvironmentValueRow = {
+  id: string;
+  key: string;
+  value: string;
+};
+
+let domainIdCounter = 0;
+let valueRowIdCounter = 0;
+
+function createEnvironmentValueRow(entry?: { key: string; value: string }): EnvironmentValueRow {
+  valueRowIdCounter += 1;
+  return {
+    id: `env-row-${valueRowIdCounter}`,
+    key: entry?.key ?? "",
+    value: entry?.value ?? "",
+  };
 }
 
-function parseEnvironmentValuesDraft(draft: string): Record<string, string> {
-  return Object.fromEntries(
-    draft
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const separatorIndex = line.indexOf("=");
-        if (separatorIndex === -1) {
-          return [line, ""];
-        }
-        const key = line.slice(0, separatorIndex).trim();
-        const value = line.slice(separatorIndex + 1);
-        return [key, value];
-      })
-      .filter(([key]) => key.length > 0),
-  );
+function toEnvironmentValueRows(values: Array<{ key: string; value: string }> | undefined): EnvironmentValueRow[] {
+  const rows = (values ?? []).map((entry) => createEnvironmentValueRow(entry));
+  return rows.length > 0 ? rows : [createEnvironmentValueRow()];
+}
+
+function toEnvironmentDomainValues(rows: EnvironmentValueRow[]) {
+  const deduped = new Map<string, string>();
+
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (key.length === 0) {
+      continue;
+    }
+    deduped.set(key, row.value);
+  }
+
+  return [...deduped.entries()].map(([key, value]) => ({ key, value }));
+}
+
+function getDuplicateEnvironmentKeys(rows: EnvironmentValueRow[]) {
+  const seenKeys = new Set<string>();
+  const duplicates = new Set<string>();
+
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (key.length === 0) {
+      continue;
+    }
+
+    if (seenKeys.has(key)) {
+      duplicates.add(key);
+      continue;
+    }
+
+    seenKeys.add(key);
+  }
+
+  return [...duplicates].sort((left, right) => left.localeCompare(right));
+}
+
+function createNextDomainId(domains: EnvironmentDomain[]) {
+  const existingIds = new Set(domains.map((domain) => domain.id));
+
+  do {
+    domainIdCounter += 1;
+  } while (existingIds.has(`domain-${domainIdCounter}`));
+
+  return `domain-${domainIdCounter}`;
+}
+
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length) {
+    return items;
+  }
+
+  const nextItems = items.slice();
+  const [movedItem] = nextItems.splice(fromIndex, 1);
+  nextItems.splice(toIndex, 0, movedItem);
+  return nextItems;
 }
 
 interface SettingsPanelProps {
@@ -53,11 +110,43 @@ export function SettingsPanel({
   const missingCount = requirements.filter((requirement) => requirement.status === "missing").length;
   const domains = getEnvironmentDomains(environmentSettings);
   const activeDomain = domains.find((domain) => domain.id === environmentSettings.activeDomainId) ?? domains[0] ?? null;
-  const envValuesKey = toEnvironmentValuesDraft(activeDomain?.values);
+  const activeDomainIndex = activeDomain ? domains.findIndex((domain) => domain.id === activeDomain.id) : -1;
+  const envValuesKey = JSON.stringify(activeDomain?.values ?? []);
   const [domainNameDraft, setDomainNameDraft] = useState(activeDomain?.name ?? "");
-  const [envValuesDraft, setEnvValuesDraft] = useState(toEnvironmentValuesDraft(activeDomain?.values));
+  const [environmentValueRows, setEnvironmentValueRows] = useState<EnvironmentValueRow[]>(
+    toEnvironmentValueRows(activeDomain?.values),
+  );
+  const [valueSearchQuery, setValueSearchQuery] = useState("");
+  const [requirementSearchQuery, setRequirementSearchQuery] = useState("");
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const duplicateKeys = getDuplicateEnvironmentKeys(environmentValueRows);
+  const savedValueRows = toEnvironmentValueRows(activeDomain?.values);
+  const hasUnsavedValueChanges =
+    JSON.stringify(toEnvironmentDomainValues(environmentValueRows)) !== JSON.stringify(toEnvironmentDomainValues(savedValueRows));
+  const normalizedValueSearchQuery = valueSearchQuery.trim().toLowerCase();
+  const normalizedRequirementSearchQuery = requirementSearchQuery.trim().toLowerCase();
+  const filteredEnvironmentValueRows = environmentValueRows.filter((row) => {
+    if (normalizedValueSearchQuery.length === 0) {
+      return true;
+    }
+
+    return row.key.toLowerCase().includes(normalizedValueSearchQuery) || row.value.toLowerCase().includes(normalizedValueSearchQuery);
+  });
+  const filteredRequirements = requirements.filter((requirement) => {
+    if (normalizedRequirementSearchQuery.length === 0) {
+      return true;
+    }
+
+    return (
+      requirement.displayName.toLowerCase().includes(normalizedRequirementSearchQuery) ||
+      requirement.stories.some((story) => story.storyTitle.toLowerCase().includes(normalizedRequirementSearchQuery))
+    );
+  });
+
+  async function persistEnvironmentValues(rows: EnvironmentValueRow[]) {
+    await updateActiveDomain({ values: toEnvironmentDomainValues(rows) });
+  }
 
   function saveDomains(nextDomains: typeof domains, activeDomainId = activeDomain?.id ?? nextDomains[0]?.id) {
     return onSaveEnvironmentSettings({
@@ -66,27 +155,54 @@ export function SettingsPanel({
     });
   }
 
-  function updateActiveDomain(next: { name?: string; values?: Record<string, string> }) {
+  function updateActiveDomain(next: {
+    name?: string;
+    values?: Record<string, string> | Array<{ key: string; value: string }>;
+  }) {
     if (!activeDomain) return Promise.resolve();
     const nextDomains = domains.map((domain) => {
       if (domain.id !== activeDomain.id) return domain;
+      const nextValues = Array.isArray(next.values)
+        ? next.values
+        : next.values
+          ? Object.entries(next.values).map(([key, value]) => ({ key, value }))
+          : undefined;
+
       return {
         ...domain,
         ...(typeof next.name === "string" ? { name: next.name } : {}),
-        ...(next.values ? { values: Object.entries(next.values).map(([key, value]) => ({ key, value })) } : {}),
+        ...(nextValues ? { values: nextValues } : {}),
       };
     });
     return saveDomains(nextDomains, activeDomain.id);
   }
 
+  function updateEnvironmentValueRow(rowId: string, field: "key" | "value", nextValue: string) {
+    setEnvironmentValueRows((previousRows) =>
+      previousRows.map((row) => (row.id === rowId ? { ...row, [field]: nextValue } : row)),
+    );
+  }
+
+  function addEnvironmentValueRow() {
+    setEnvironmentValueRows((previousRows) => [...previousRows, createEnvironmentValueRow()]);
+  }
+
+  function removeEnvironmentValueRow(rowId: string) {
+    setEnvironmentValueRows((previousRows) => {
+      const nextRows = previousRows.filter((row) => row.id !== rowId);
+      return nextRows.length > 0 ? nextRows : [createEnvironmentValueRow()];
+    });
+  }
+
   useEffect(() => {
     setDomainNameDraft(activeDomain?.name ?? "");
+    setValueSearchQuery("");
     setImportSummary(null);
     setImportError(null);
   }, [activeDomain?.id, activeDomain?.name]);
 
   useEffect(() => {
-    setEnvValuesDraft(toEnvironmentValuesDraft(activeDomain?.values));
+    setEnvironmentValueRows(toEnvironmentValueRows(activeDomain?.values));
   }, [envValuesKey]);
 
   return (
@@ -121,7 +237,7 @@ export function SettingsPanel({
                 type="button"
                 className="settings-text-button"
                 onClick={() => {
-                  const nextId = `domain-${domains.length + 1}`;
+                  const nextId = createNextDomainId(domains);
                   void saveDomains(
                     [...domains, { id: nextId, name: `Domain ${domains.length + 1}`, values: [] }],
                     nextId,
@@ -168,23 +284,104 @@ export function SettingsPanel({
                   }}
                   placeholder="Domain name"
                 />
+                <div className="settings-domain-actions">
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    disabled={activeDomainIndex <= 0}
+                    onClick={() => {
+                      if (activeDomainIndex <= 0 || !activeDomain) return;
+                      void saveDomains(moveItem(domains, activeDomainIndex, activeDomainIndex - 1), activeDomain.id);
+                    }}
+                  >
+                    Move up
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    disabled={activeDomainIndex < 0 || activeDomainIndex >= domains.length - 1}
+                    onClick={() => {
+                      if (activeDomainIndex < 0 || activeDomainIndex >= domains.length - 1 || !activeDomain) return;
+                      void saveDomains(moveItem(domains, activeDomainIndex, activeDomainIndex + 1), activeDomain.id);
+                    }}
+                  >
+                    Move down
+                  </button>
+                  <button
+                    className="btn btn-sm"
+                    type="button"
+                    disabled={!activeDomain}
+                    onClick={() => {
+                      if (!activeDomain) return;
+                      const shouldDelete = window.confirm(`Delete domain \"${activeDomain.name}\"?`);
+                      if (!shouldDelete) return;
+
+                      const nextDomains = domains.filter((domain) => domain.id !== activeDomain.id);
+                      const nextActiveDomain = nextDomains[Math.max(0, activeDomainIndex - 1)] ?? nextDomains[0] ?? null;
+                      void saveDomains(nextDomains, nextActiveDomain?.id);
+                    }}
+                  >
+                    Delete domain
+                  </button>
+                </div>
                 <h3 className="settings-subsection-title">Environment Values</h3>
                 <p className="settings-section-description">
                   実行で使う key/value を直接入力します。ここに入れた値が最優先で使われます。
                 </p>
               </div>
-              <div className="settings-source-row">
-                <textarea
-                  className="settings-source-input"
-                  value={envValuesDraft}
-                  onChange={(event) => setEnvValuesDraft(event.target.value)}
-                  placeholder={`API_KEY=secret\nBASE_URL=https://example.com`}
-                  rows={4}
+              <div className="settings-search-row">
+                <input
+                  className="settings-search-input"
+                  value={valueSearchQuery}
+                  onChange={(event) => setValueSearchQuery(event.target.value)}
+                  placeholder="Search values"
+                  aria-label="Search environment values"
                 />
+                {hasUnsavedValueChanges && <span className="settings-dirty-badge">Unsaved changes</span>}
+              </div>
+              <div className="settings-value-list" role="list" aria-label="Environment values">
+                {filteredEnvironmentValueRows.map((row) => {
+                  const index = environmentValueRows.findIndex((candidate) => candidate.id === row.id);
+
+                  return (
+                  <div key={row.id} className="settings-value-row" role="listitem">
+                    <input
+                      className="settings-value-key-input"
+                      value={row.key}
+                      onChange={(event) => updateEnvironmentValueRow(row.id, "key", event.target.value)}
+                      placeholder="API_KEY"
+                      aria-label={`Environment key ${index + 1}`}
+                    />
+                    <input
+                      className="settings-value-input"
+                      value={row.value}
+                      onChange={(event) => updateEnvironmentValueRow(row.id, "value", event.target.value)}
+                      placeholder="secret"
+                      aria-label={`Environment value ${index + 1}`}
+                    />
+                    <button
+                      className="settings-text-button"
+                      type="button"
+                      onClick={() => removeEnvironmentValueRow(row.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  );
+                })}
+              </div>
+              {filteredEnvironmentValueRows.length === 0 && (
+                <div className="settings-empty-inline">No matching values.</div>
+              )}
+              <div className="settings-value-actions">
+                <button className="btn" type="button" onClick={addEnvironmentValueRow}>
+                  Add row
+                </button>
                 <button
                   className="btn"
                   type="button"
-                  onClick={() => void updateActiveDomain({ values: parseEnvironmentValuesDraft(envValuesDraft) })}
+                  disabled={!activeDomain || duplicateKeys.length > 0 || !hasUnsavedValueChanges}
+                  onClick={() => void persistEnvironmentValues(environmentValueRows)}
                 >
                   Save
                 </button>
@@ -200,14 +397,20 @@ export function SettingsPanel({
                     className="settings-text-button"
                     type="button"
                     onClick={() => {
-                      setEnvValuesDraft("");
-                      void updateActiveDomain({ values: {} });
+                      const nextRows = [createEnvironmentValueRow()];
+                      setEnvironmentValueRows(nextRows);
+                      void persistEnvironmentValues(nextRows);
                     }}
                   >
                     Clear
                   </button>
                 )}
               </div>
+              {duplicateKeys.length > 0 && (
+                <div className="settings-inline-error" role="alert">
+                  Duplicate keys: {duplicateKeys.join(", ")}
+                </div>
+              )}
             </div>
 
             <div className="settings-section settings-section-compact">
@@ -229,7 +432,10 @@ export function SettingsPanel({
                       const mergedValues = Object.fromEntries(
                         [...(activeDomain.values ?? []), ...imported.values].map(({ key, value }) => [key, value]),
                       );
-                      setEnvValuesDraft(toEnvironmentValuesDraft(imported.values));
+                      const nextRows = toEnvironmentValueRows(
+                        Object.entries(mergedValues).map(([key, value]) => ({ key, value })),
+                      );
+                      setEnvironmentValueRows(nextRows);
                       await updateActiveDomain({ values: mergedValues });
                       setImportSummary(`${imported.filePath} から ${imported.values.length} 件取り込みました`);
                       setImportError(null);
@@ -276,6 +482,15 @@ export function SettingsPanel({
                 <p className="settings-section-description">
                   `baseUrl`, step の `target`, `value` に含まれる `ENV.*` を集約しています。
                 </p>
+                <div className="settings-search-row settings-search-row-secondary">
+                  <input
+                    className="settings-search-input"
+                    value={requirementSearchQuery}
+                    onChange={(event) => setRequirementSearchQuery(event.target.value)}
+                    placeholder="Search requirements or stories"
+                    aria-label="Search environment requirements"
+                  />
+                </div>
               </div>
 
               {requirements.length === 0 ? (
@@ -285,9 +500,11 @@ export function SettingsPanel({
                     Story に <code>{"{{ENV.NAME}}"}</code> を含めると、必要な変数がここに表示されます。
                   </p>
                 </div>
+              ) : filteredRequirements.length === 0 ? (
+                <div className="settings-empty-inline">No matching requirements.</div>
               ) : (
                 <div className="settings-requirements-list" role="list">
-                  {requirements.map((requirement) => (
+                  {filteredRequirements.map((requirement) => (
                     <article key={requirement.name} className="settings-requirement-card" role="listitem">
                       <div className="settings-requirement-top">
                         <div>

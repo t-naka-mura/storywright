@@ -27,6 +27,7 @@ export function StepEditor({ step, onSave, onCancel, onDelete, onOpenSettings }:
       ...extractEnvironmentVariableNames(draft.value),
     ]),
   );
+  const shouldSuggestSensitive = draft.action === "type" && referencedVariables.length > 0 && !draft.sensitive;
 
   return (
     <div className="step-editor">
@@ -81,16 +82,32 @@ export function StepEditor({ step, onSave, onCancel, onDelete, onOpenSettings }:
       )}
 
       {draft.action === "type" && (
-        <div className="step-editor-field">
-          <label className="step-editor-checkbox">
-            <input
-              type="checkbox"
-              checked={draft.sensitive ?? false}
-              onChange={(e) => setDraft({ ...draft, sensitive: e.target.checked || undefined })}
-            />
-            機密値（パスワード等）
-          </label>
-        </div>
+        <>
+          <div className="step-editor-field">
+            <label className="step-editor-checkbox">
+              <input
+                type="checkbox"
+                checked={draft.sensitive ?? false}
+                onChange={(e) => setDraft({ ...draft, sensitive: e.target.checked || undefined })}
+              />
+              機密値（パスワード等）
+            </label>
+          </div>
+          {shouldSuggestSensitive && (
+            <div className="step-editor-sensitive-hint" role="note">
+              <span className="step-editor-sensitive-hint-text">
+                ENV 参照を含む入力は sensitive を有効にしておくと、一覧表示や export 時の扱いを揃えやすくなります。
+              </span>
+              <button
+                className="step-editor-env-link"
+                type="button"
+                onClick={() => setDraft({ ...draft, sensitive: true })}
+              >
+                sensitive にする
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {referencedVariables.length > 0 && (

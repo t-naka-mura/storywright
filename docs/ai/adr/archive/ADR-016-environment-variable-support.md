@@ -1,9 +1,9 @@
 # ADR-016: ステップ値での環境変数参照サポート
 
 - 日付: 2026-04-03
-- ステータス: 提案
+- ステータス: 承認済み（実装完了）
 
-## 実装進捗サマリ（2026-04-04 時点）
+## 実装完了サマリ（2026-04-04 時点）
 
 ### 実装済み
 
@@ -16,18 +16,22 @@
 - Step 編集中 / Base URL 編集中に `ENV.*` 利用を示し、Settings を開ける導線
 - Settings での domain 切り替えと local key/value 管理
 - `.env` を active domain の key/value に取り込む基盤
-
-### まだ未実装
-
 - key/value 編集 UI の行単位編集化
-- `{{ENV.*}}` を含む step への `sensitive: true` 自動提案の強化
-- import/export 時の setup guide 生成
+- `{{ENV.*}}` を含む type step への `sensitive: true` 提案 UI
+- export / import 完了時の environment setup guide 表示
+- Settings 上での values / requirements 検索
+- Settings 上での未保存変更表示
 
 ### 現在地
 
 `ENV.*` の実行基盤はできている。
 Settings では domain ごとに local key/value を持てる。
 `.env` は継続参照先ではなく、active domain へ値を取り込む手段として扱う。
+必要変数の可視化、値編集、実行前チェック、setup guide まで一通り揃った。
+Settings では検索と未保存変更表示により、ローカル値の調整もしやすくなった。
+
+本 ADR の完了条件は満たしている。
+今後の UI / UX 改善は本 ADR の成立条件ではなく、別途の改善課題として扱う。
 
 ## Context (背景)
 
@@ -142,18 +146,19 @@ UI では「どの source が最後に勝つか」よりも、「どのドメイ
 実装状況:
 
 - 1, 2, 3, 4 は実装済み
-- 5 は一部のみ。`ENV.*` 利用の可視化導線はあるが、自動提案 UI は未完了
+- 5 も実装済み。`ENV.*` を含む type step では `sensitive` 提案 UI を表示する
 
 補足:
 
 - `{{ENV.*}}` を含む step は share export と相性が良い
 - 未解決の `{{ENV.*}}` は import 自体ではなく、実行時の解決エラーとして扱う
 
-### 次の実装
+### 次の候補
 
-- key/value 編集を textarea から行単位 UI にする
-- domain の追加だけでなく削除や並び整理もできるようにする
-- 将来的にはドメイン / 環境単位で key/value セットを切り替えやすくする
+- 将来的にはドメイン / 環境単位で key/value セットをさらに切り替えやすくする
+- setup guide の文面や導線を import/export 専用 UI に発展させる余地がある
+
+これらは ADR-016 の追加成立条件ではなく、実装完了後の拡張候補である。
 
 ## テスト戦略
 

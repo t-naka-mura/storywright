@@ -393,10 +393,109 @@ body,
   border-color: var(--color-accent);
 }
 
+.settings-domain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
 .settings-source-row {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+}
+
+.settings-value-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-value-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.7fr) minmax(220px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-value-key-input,
+.settings-value-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.settings-value-key-input {
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.settings-value-key-input:focus,
+.settings-value-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.settings-value-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.settings-search-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.settings-search-row-secondary {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+.settings-search-input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.settings-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.settings-dirty-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(217, 135, 87, 0.18);
+  color: #8e4b21;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.settings-empty-inline {
+  padding: 14px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background: rgba(245, 243, 240, 0.7);
+  color: var(--color-text-secondary);
+  font-size: 12px;
 }
 
 .settings-source-input {
@@ -614,6 +713,22 @@ body,
   .settings-source-row,
   .settings-source-meta-row,
   .settings-source-status-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-value-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .settings-value-actions,
+  .settings-domain-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-search-row {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1458,6 +1573,25 @@ body,
   min-width: 0;
 }
 
+.step-editor-sensitive-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -4px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(91, 123, 215, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(91, 123, 215, 0.06);
+}
+
+.step-editor-sensitive-hint-text {
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
 .step-editor-actions {
   display: flex;
   gap: 4px;
@@ -1733,6 +1867,46 @@ li:hover + li .step-insert-zone .btn-insert {
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+  line-height: 1.6;
+}
+
+.dialog-setup-guide {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(91, 123, 215, 0.18);
+  border-radius: 12px;
+  background: rgba(91, 123, 215, 0.05);
+}
+
+.dialog-setup-guide-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.dialog-setup-guide-subtitle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+}
+
+.dialog-setup-guide-list {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+  margin: 0 0 12px;
+}
+
+.dialog-setup-guide-item {
+  font-size: 12px;
+  font-family: "SF Mono", "Fira Code", monospace;
+  color: var(--color-text);
+}
+
+.dialog-setup-guide-footer {
+  font-size: 12px;
+  color: var(--color-text-secondary);
   line-height: 1.6;
 }
 

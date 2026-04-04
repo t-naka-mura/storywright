@@ -17,6 +17,11 @@ export interface EnvironmentRequirement {
   stories: EnvironmentRequirementUsage[];
 }
 
+export interface EnvironmentSetupGuide {
+  requirements: string[];
+  footer: string;
+}
+
 export function getMissingEnvironmentRequirementsForStory(
   story: Story,
   env: Record<string, string | undefined> = {},
@@ -85,4 +90,17 @@ export function collectEnvironmentRequirements(
       ),
     }))
     .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+export function createEnvironmentSetupGuide(stories: Record<string, Story>): EnvironmentSetupGuide | null {
+  const requirements = collectEnvironmentRequirements(stories, {});
+
+  if (requirements.length === 0) {
+    return null;
+  }
+
+  return {
+    requirements: requirements.map((requirement) => requirement.displayName),
+    footer: "Open Settings to add local values or import a .env file.",
+  };
 }

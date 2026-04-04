@@ -160,4 +160,34 @@ describe("StepEditor sensitive トグル", () => {
     fireEvent.click(screen.getByText("Settings を開く"));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
+
+  it("ENV 参照の type step では sensitive 提案を表示する", () => {
+    render(
+      <StepEditor
+        step={createStep({ action: "type", value: "{{ENV.PASSWORD}}", sensitive: false })}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("sensitive にする")).toBeInTheDocument();
+  });
+
+  it("sensitive 提案を押して Save すると sensitive=true で保存される", () => {
+    const onSave = vi.fn();
+    render(
+      <StepEditor
+        step={createStep({ action: "type", value: "{{ENV.PASSWORD}}", sensitive: false })}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("sensitive にする"));
+    fireEvent.click(screen.getByText("Save"));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sensitive: true }));
+  });
 });

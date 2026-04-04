@@ -8,6 +8,8 @@ import { ErrorDialog } from "./components/ErrorDialog";
 import type { EnvironmentSettings, EnvironmentSourceStatus, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import {
   collectEnvironmentRequirements,
+  createEnvironmentSetupGuide,
+  type EnvironmentSetupGuide,
   getMissingEnvironmentRequirementsForStory,
   type EnvironmentRequirement,
 } from "./lib/environmentRequirements";
@@ -31,6 +33,7 @@ type AppErrorState = {
   message: string;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
+  setupGuide?: EnvironmentSetupGuide;
 };
 
 let storyIdCounter = 0;
@@ -176,6 +179,7 @@ function App() {
     }
 
     try {
+      const setupGuide = createEnvironmentSetupGuide(stories);
       const filePath = await window.storywright.exportStoriesToFile(
         createExportStoryDocument(stories),
         "storywright-stories.storywright.json",
@@ -186,6 +190,7 @@ function App() {
       setError({
         title: "Export 完了",
         message: `${storyCount} stories を export しました。\n\n${filePath}`,
+        ...(setupGuide ? { setupGuide } : {}),
       });
     } catch (err) {
       setError({
@@ -197,6 +202,7 @@ function App() {
 
   const handleExportStory = useCallback(async (story: Story) => {
     try {
+      const setupGuide = createEnvironmentSetupGuide({ [story.id]: story });
       const filePath = await window.storywright.exportStoriesToFile(
         createExportStoryDocument({ [story.id]: story }),
         toPortableFilename(story.title),
@@ -207,6 +213,7 @@ function App() {
       setError({
         title: "Export 完了",
         message: `${story.title} を export しました。\n\n${filePath}`,
+        ...(setupGuide ? { setupGuide } : {}),
       });
     } catch (err) {
       setError({
@@ -223,7 +230,8 @@ function App() {
         return;
       }
 
-      const result = mergeImportedStories(stories, importedData);
+      const importedStories = normalizeStoriesData(importedData);
+      const result = mergeImportedStories(stories, importedStories);
       if (result.importedCount === 0) {
         setError({
           title: "Import エラー",
@@ -237,11 +245,13 @@ function App() {
         setSelectedStoryId(result.firstImportedStoryId);
       }
 
+      const setupGuide = createEnvironmentSetupGuide(importedStories);
       setError({
         title: "Import 完了",
         message:
           `${result.importedCount} stories を取り込みました。` +
           (result.duplicatedCount > 0 ? `\n${result.duplicatedCount} stories は imported copy として追加しました。` : ""),
+        ...(setupGuide ? { setupGuide } : {}),
       });
     } catch (err) {
       setError({
@@ -598,6 +608,7 @@ function App() {
           message={error.message}
           primaryActionLabel={error.primaryActionLabel}
           onPrimaryAction={error.onPrimaryAction}
+          setupGuide={error.setupGuide}
           onClose={() => setError(null)}
         />
       )}

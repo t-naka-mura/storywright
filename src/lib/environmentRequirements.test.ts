@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Story } from "../types";
 import {
   collectEnvironmentRequirements,
+  createEnvironmentSetupGuide,
   extractEnvironmentVariableNames,
   getMissingEnvironmentRequirementsForStory,
 } from "./environmentRequirements";
@@ -140,5 +141,33 @@ describe("getMissingEnvironmentRequirementsForStory", () => {
         stories: [{ storyId: "login", storyTitle: "Login" }],
       },
     ]);
+  });
+});
+
+describe("createEnvironmentSetupGuide", () => {
+  it("ENV requirement があれば setup guide を返す", () => {
+    const guide = createEnvironmentSetupGuide({
+      storyA: createStory("storyA", "Login", {
+        steps: [createStep({ id: "step-1", order: 1, action: "type", target: "#pass", value: "{{ENV.PASSWORD}}" })],
+      }),
+      storyB: createStory("storyB", "API", {
+        steps: [createStep({ id: "step-2", order: 1, action: "type", target: "#token", value: "{{ENV.API_TOKEN}}" })],
+      }),
+    });
+
+    expect(guide).toEqual({
+      requirements: ["ENV.API_TOKEN", "ENV.PASSWORD"],
+      footer: "Open Settings to add local values or import a .env file.",
+    });
+  });
+
+  it("ENV requirement がなければ null を返す", () => {
+    const guide = createEnvironmentSetupGuide({
+      storyA: createStory("storyA", "Login", {
+        steps: [createStep({ id: "step-1", order: 1, action: "click", target: "#submit", value: "" })],
+      }),
+    });
+
+    expect(guide).toBeNull();
   });
 });

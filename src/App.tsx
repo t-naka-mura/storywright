@@ -6,6 +6,7 @@ import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
 import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import { useUrlHistory } from "./hooks/useUrlHistory";
+import { createStep, createStoryMetadata, normalizeStoriesData, normalizeStory, serializeStories } from "./lib/storyDocument";
 import "./App.css";
 
 const defaultStories: Record<string, Story> = {};
@@ -35,8 +36,8 @@ function App() {
   // 起動時にファイルからデータを読み込み
   useEffect(() => {
     async function load() {
-      const savedStories = await window.storywright.loadData("stories.json");
-      if (savedStories) setStories(savedStories as Record<string, Story>);
+      const savedStories = await window.storywright.loadStories();
+      setStories(normalizeStoriesData(savedStories));
       setDataLoaded(true);
     }
     load();
@@ -45,14 +46,14 @@ function App() {
   // ファイルへの永続化（データ読み込み完了後のみ）
   useEffect(() => {
     if (!dataLoaded) return;
-    window.storywright.saveData("stories.json", stories);
+    window.storywright.saveStories(serializeStories(stories));
   }, [stories, dataLoaded]);
 
   const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
   const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;
 
   const handleUpdateStory = useCallback((story: Story) => {
-    setStories((prev) => ({ ...prev, [story.id]: story }));
+    setStories((prev) => ({ ...prev, [story.id]: normalizeStory(story) }));
   }, []);
 
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
@@ -168,7 +169,7 @@ function App() {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const id = `story-${++storyIdCounter}`;
-      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [], createdAt: Date.now() };
+      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [], metadata: createStoryMetadata(Date.now()) };
       setStories((prev) => ({ ...prev, [id]: newStory }));
       setSelectedStoryId(id);
       targetStoryId = id;
@@ -184,14 +185,14 @@ function App() {
       setStories((prev) => {
         const story = prev[recordingStoryId];
         if (!story) return prev;
-        const newStep = {
+        const newStep = createStep({
           order: story.steps.length + 1,
           action: step.action as Story["steps"][number]["action"],
           target: step.target,
           value: step.value,
           description: "",
           ...(step.sensitive ? { sensitive: true } : {}),
-        };
+        });
         return { ...prev, [recordingStoryId]: { ...story, steps: [...story.steps, newStep] } };
       });
       setRecordedStepCount((c) => c + 1);

@@ -1,10 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("storywright", {
-  saveData: (filename: string, data: unknown) =>
-    ipcRenderer.invoke("save-data", filename, data),
-  loadData: (filename: string) =>
-    ipcRenderer.invoke("load-data", filename),
+  saveStories: (data: unknown) =>
+    ipcRenderer.invoke("stories:save", data),
+  loadStories: () =>
+    ipcRenderer.invoke("stories:load"),
+  saveLocalState: (key: "urlHistory", data: unknown) =>
+    ipcRenderer.invoke("local-state:save", key, data),
+  loadLocalState: (key: "urlHistory") =>
+    ipcRenderer.invoke("local-state:load", key),
   runStory: (storyJson: string, keepSession?: boolean) =>
     ipcRenderer.invoke("run-story", storyJson, keepSession),
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) =>

@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
-const FILENAME = "urlHistory.json";
 const MAX_HISTORY = 20;
 const DEFAULT_URL = "https://example.com";
 
@@ -18,7 +17,7 @@ export function useUrlHistory() {
   // 起動時にファイルから読み込み
   useEffect(() => {
     async function load() {
-      const saved = await window.storywright.loadData(FILENAME) as UrlHistoryData | null;
+      const saved = await window.storywright.loadLocalState("urlHistory") as UrlHistoryData | null;
       if (saved) {
         setBaseUrlState(saved.lastBaseUrl || DEFAULT_URL);
         setUrlHistory(saved.history || []);
@@ -32,7 +31,7 @@ export function useUrlHistory() {
   // ファイルへの永続化
   const persist = useCallback((data: UrlHistoryData) => {
     dataRef.current = data;
-    window.storywright.saveData(FILENAME, data);
+    window.storywright.saveLocalState("urlHistory", data);
   }, []);
 
   const setBaseUrl = useCallback((url: string) => {

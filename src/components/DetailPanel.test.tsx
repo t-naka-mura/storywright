@@ -2,12 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { DetailPanel } from "./DetailPanel";
 import type { Story } from "../types";
+import { createStoryMetadata } from "../lib/storyDocument";
 
 function createStory(overrides?: Partial<Story>): Story {
   return {
     id: "test-story",
     title: "Test Story",
     steps: [],
+    metadata: createStoryMetadata(1),
     ...overrides,
   };
 }
@@ -32,7 +34,7 @@ describe("DetailPanel sensitive マスキング", () => {
   it("sensitive な値は「••••••」で表示される", () => {
     const story = createStory({
       steps: [
-        { order: 1, action: "type", target: "#password", value: "secret123", description: "", sensitive: true },
+        { id: "step-1", order: 1, action: "type", target: "#password", value: "secret123", description: "", sensitive: true },
       ],
     });
 
@@ -45,7 +47,7 @@ describe("DetailPanel sensitive マスキング", () => {
   it("sensitive でない値はそのまま表示される", () => {
     const story = createStory({
       steps: [
-        { order: 1, action: "type", target: "#username", value: "admin", description: "" },
+        { id: "step-1", order: 1, action: "type", target: "#username", value: "admin", description: "" },
       ],
     });
 
@@ -57,7 +59,7 @@ describe("DetailPanel sensitive マスキング", () => {
   it("sensitive ステップに鍵バッジが表示される", () => {
     const story = createStory({
       steps: [
-        { order: 1, action: "type", target: "#password", value: "secret", description: "", sensitive: true },
+        { id: "step-1", order: 1, action: "type", target: "#password", value: "secret", description: "", sensitive: true },
       ],
     });
 
@@ -70,7 +72,7 @@ describe("DetailPanel sensitive マスキング", () => {
   it("sensitive でないステップに鍵バッジは表示されない", () => {
     const story = createStory({
       steps: [
-        { order: 1, action: "type", target: "#username", value: "admin", description: "" },
+        { id: "step-1", order: 1, action: "type", target: "#username", value: "admin", description: "" },
       ],
     });
 

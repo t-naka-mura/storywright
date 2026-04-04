@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import type { Story, Step, StoryResult, RepeatResult } from "../types";
 import { StepEditor } from "./StepEditor";
+import { createStep, getStoryCreatedAt } from "../lib/storyDocument";
 
 interface DetailPanelProps {
   isOpen: boolean;
@@ -22,7 +23,7 @@ interface DetailPanelProps {
 }
 
 function createEmptyStep(order: number): Step {
-  return { order, action: "click", target: "", value: "", description: "" };
+  return createStep({ order, action: "click", target: "", value: "", description: "" });
 }
 
 function renumberSteps(steps: Step[]): Step[] {
@@ -76,7 +77,7 @@ export function DetailPanel({
   const handleDuplicateStep = (index: number) => {
     if (!story) return;
     const original = story.steps[index];
-    const copy = { ...original, order: 0, description: original.description };
+    const copy = createStep({ ...original, id: "", order: 0, description: original.description });
     const steps = [...story.steps];
     steps.splice(index + 1, 0, copy);
     onUpdateStory({ ...story, steps: renumberSteps(steps) });
@@ -204,7 +205,7 @@ export function DetailPanel({
                   (r) => r.order === step.order,
                 );
                 return (
-                  <li key={`${step.order}-${index}`}>
+                  <li key={step.id}>
                     {/* 中間挿入ボタン */}
                     <div className="step-insert-zone">
                       <button
@@ -303,8 +304,8 @@ export function DetailPanel({
                 </div>
                 {[...standaloneStories].sort((a, b) => {
                   if (sortBy === "name") return a.title.localeCompare(b.title);
-                  const aTime = a.createdAt ?? 0;
-                  const bTime = b.createdAt ?? 0;
+                  const aTime = getStoryCreatedAt(a);
+                  const bTime = getStoryCreatedAt(b);
                   return sortBy === "newest" ? bTime - aTime : aTime - bTime;
                 }).map((s) => {
                   const result = storyResults[s.id];

@@ -41,8 +41,10 @@ describe("PreviewPanel", () => {
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 
     const api: StorywrightAPI = {
-      saveData: vi.fn(async () => {}),
-      loadData: vi.fn(async () => null),
+      saveStories: vi.fn(async () => {}),
+      loadStories: vi.fn(async () => null),
+      saveLocalState: vi.fn(async () => {}),
+      loadLocalState: vi.fn(async () => null),
       runStory: vi.fn(async () => createStoryResult()),
       runStoryRepeat: vi.fn(async () => createRepeatResult()),
       cancelRun: vi.fn(async () => {}),

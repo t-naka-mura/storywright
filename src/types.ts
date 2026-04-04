@@ -1,10 +1,17 @@
 export interface Step {
+  id: string;
   order: number;
   action: "navigate" | "click" | "type" | "select" | "assert" | "wait" | "screenshot";
   target: string;
   value: string;
+  valueRef?: string;
   description: string;
   sensitive?: boolean;
+}
+
+export interface StoryMetadata {
+  createdAt: number;
+  updatedAt?: number;
 }
 
 export interface Story {
@@ -12,8 +19,17 @@ export interface Story {
   title: string;
   baseUrl?: string;
   steps: Step[];
-  createdAt?: number; // Unix timestamp (ms)
+  metadata: StoryMetadata;
+  createdAt?: number; // legacy field for migration compatibility
 }
+
+export interface StoryDocument {
+  schemaVersion: 1;
+  stories: Record<string, Story>;
+  exportedAt?: string;
+}
+
+export type LocalStateKey = "urlHistory";
 
 export type StepResult = {
   order: number;
@@ -82,8 +98,10 @@ export type PreviewState = {
 
 // Electron IPC bridge
 export interface StorywrightAPI {
-  saveData: (filename: string, data: unknown) => Promise<void>;
-  loadData: (filename: string) => Promise<unknown>;
+  saveStories: (data: StoryDocument) => Promise<void>;
+  loadStories: () => Promise<unknown>;
+  saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
+  loadLocalState: (key: LocalStateKey) => Promise<unknown>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRun: () => Promise<void>;

@@ -2,6 +2,11 @@ const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebC
 const path = require("path");
 const fs = require("fs");
 
+const STORIES_FILENAME = "stories.json";
+const LOCAL_STATE_FILENAMES = {
+  urlHistory: "urlHistory.json",
+} as const;
+
 // === データ永続化 ===
 
 function getDataDir(): string {
@@ -25,9 +30,10 @@ function decryptValue(value: string): string {
   return safeStorage.decryptString(buffer);
 }
 
-function encryptSensitiveSteps(data: unknown): unknown {
-  if (!data || typeof data !== "object") return data;
-  const record = data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>;
+function mapSensitiveStepsInRecord(
+  record: Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>,
+  transform: (value: string) => string,
+): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, story] of Object.entries(record)) {
     if (!story || !Array.isArray(story.steps)) {
@@ -38,50 +44,78 @@ function encryptSensitiveSteps(data: unknown): unknown {
       ...story,
       steps: story.steps.map((step) =>
         step.sensitive && step.value
-          ? { ...step, value: encryptValue(step.value) }
+          ? { ...step, value: transform(step.value) }
           : step
       ),
     };
   }
   return result;
+}
+
+function encryptSensitiveSteps(data: unknown): unknown {
+  if (!data || typeof data !== "object") return data;
+  if ("stories" in data && data.stories && typeof data.stories === "object") {
+    return {
+      ...data,
+      stories: mapSensitiveStepsInRecord(
+        data.stories as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>,
+        encryptValue,
+      ),
+    };
+  }
+  return mapSensitiveStepsInRecord(
+    data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>,
+    encryptValue,
+  );
 }
 
 function decryptSensitiveSteps(data: unknown): unknown {
   if (!data || typeof data !== "object") return data;
-  const record = data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>;
-  const result: Record<string, unknown> = {};
-  for (const [key, story] of Object.entries(record)) {
-    if (!story || !Array.isArray(story.steps)) {
-      result[key] = story;
-      continue;
-    }
-    result[key] = {
-      ...story,
-      steps: story.steps.map((step) =>
-        step.sensitive && step.value
-          ? { ...step, value: decryptValue(step.value) }
-          : step
+  if ("stories" in data && data.stories && typeof data.stories === "object") {
+    return {
+      ...data,
+      stories: mapSensitiveStepsInRecord(
+        data.stories as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>,
+        decryptValue,
       ),
     };
   }
-  return result;
+  return mapSensitiveStepsInRecord(
+    data as Record<string, { steps?: Array<{ sensitive?: boolean; value?: string }> }>,
+    decryptValue,
+  );
 }
 
-function saveData(filename: string, data: unknown): void {
+function saveFile(filename: string, data: unknown): void {
   const filePath = path.join(getDataDir(), filename);
-  const toSave = filename === "stories.json" ? encryptSensitiveSteps(data) : data;
-  fs.writeFileSync(filePath, JSON.stringify(toSave, null, 2), "utf-8");
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
-function loadData<T>(filename: string, fallback: T): T {
+function loadFile<T>(filename: string, fallback: T): T {
   const filePath = path.join(getDataDir(), filename);
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    const raw = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-    return (filename === "stories.json" ? decryptSensitiveSteps(raw) : raw) as T;
+    return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
   } catch {
     return fallback;
   }
+}
+
+function saveStories(data: unknown): void {
+  saveFile(STORIES_FILENAME, encryptSensitiveSteps(data));
+}
+
+function loadStories<T>(fallback: T): T {
+  const raw = loadFile(STORIES_FILENAME, fallback);
+  return decryptSensitiveSteps(raw) as T;
+}
+
+function saveLocalState(key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown): void {
+  saveFile(LOCAL_STATE_FILENAMES[key], data);
+}
+
+function loadLocalState<T>(key: keyof typeof LOCAL_STATE_FILENAMES, fallback: T): T {
+  return loadFile(LOCAL_STATE_FILENAMES[key], fallback);
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -744,13 +778,20 @@ function teardownRecorder() {
 // === IPC Handlers ===
 
 function registerIpcHandlers() {
-  // データ永続化
-  ipcMain.handle("save-data", async (_event, filename: string, data: unknown) => {
-    saveData(filename, data);
+  ipcMain.handle("stories:save", async (_event, data: unknown) => {
+    saveStories(data);
   });
 
-  ipcMain.handle("load-data", async (_event, filename: string) => {
-    return loadData(filename, null);
+  ipcMain.handle("stories:load", async () => {
+    return loadStories(null);
+  });
+
+  ipcMain.handle("local-state:save", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown) => {
+    saveLocalState(key, data);
+  });
+
+  ipcMain.handle("local-state:load", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES) => {
+    return loadLocalState(key, null);
   });
 
   ipcMain.handle("preview:get-state", async () => getPreviewState());

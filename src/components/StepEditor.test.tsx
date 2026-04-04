@@ -5,6 +5,7 @@ import type { Step } from "../types";
 
 function createStep(overrides?: Partial<Step>): Step {
   return {
+    id: "step-1",
     order: 1,
     action: "type",
     target: "#input",

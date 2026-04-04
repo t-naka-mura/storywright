@@ -70,6 +70,26 @@ Phase 2: `.env` ファイルパス指定と読み込み（オプション）
 
 ## 実装方針
 
+### ADR-017 との関係
+
+ADR-017 は Story の保存境界と export/import の責務を定義する ADR であり、ADR-016 と競合しない。
+
+- ADR-016: 実行時に step の値をどう解決するか
+- ADR-017: Story 本体、local state、secret store をどう分離するか
+
+そのため、`{{ENV.*}}` は portable な Story 表現の一部として扱える。
+一方で、ローカル secret store を使う `valueRef` ベースの step も将来的に併存しうる。
+
+### 値解決の優先順位
+
+将来的に ADR-017 の `valueRef` を導入した場合、step の実効値は次の優先順位で解決する。
+
+1. `valueRef` があれば local secret store から解決する
+2. `value` に `{{ENV.*}}` が含まれていれば環境変数展開する
+3. どちらでもなければ `value` をそのまま使う
+
+この優先順位により、portable export と local secret の併存が可能になる。
+
 ### Phase 1: 環境変数参照
 
 1. **値の解決**: ステップ実行前に `value` 内の `{{ENV.XXX}}` パターンを `process.env.XXX` で置換
@@ -77,6 +97,11 @@ Phase 2: `.env` ファイルパス指定と読み込み（オプション）
 3. **UI表示**: プレースホルダはそのまま表示（実値は表示しない）
 4. **エラー処理**: 未定義の環境変数参照はステップ実行時にエラーとして報告
 5. **sensitive 連携**: `{{ENV.*}}` を含むステップは自動的に `sensitive: true` を推奨（UIで提案）
+
+補足:
+
+- `{{ENV.*}}` を含む step は share export と相性が良い
+- 未解決の `{{ENV.*}}` は import 自体ではなく、実行時の解決エラーとして扱う
 
 ### Phase 2: .env ファイルサポート
 

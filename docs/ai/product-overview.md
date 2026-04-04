@@ -108,6 +108,8 @@ interface Step {
 
 - [ADR-011](adr/ADR-011-repeat-execution.md) — 繰り返し実行
 - [ADR-013](adr/ADR-013-multi-tab-preview.md) — Preview の複数タブ対応
+- [ADR-016](adr/ADR-016-environment-variable-support.md) — ステップ値での環境変数参照サポート
+- [ADR-017](adr/ADR-017-portable-story-storage-and-import-export.md) — Portable Story Storage と Import/Export 境界
 
 ### ADR（アーカイブ）
 

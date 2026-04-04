@@ -27,6 +27,13 @@ type AppErrorState = {
 
 let storyIdCounter = 0;
 
+function getEnvironmentFilePaths(settings: EnvironmentSettings): string[] {
+  if (settings.envFilePaths && settings.envFilePaths.length > 0) {
+    return settings.envFilePaths;
+  }
+  return settings.envFilePath ? [settings.envFilePath] : [];
+}
+
 function App() {
   const [stories, setStories] = useState<Record<string, Story>>(defaultStories);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -50,6 +57,7 @@ function App() {
   const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+  const environmentFilePathsKey = getEnvironmentFilePaths(environmentSettings).join("\n");
 
   // 起動時にファイルからデータを読み込み
   useEffect(() => {
@@ -90,7 +98,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [environmentSettings.envFilePath]);
+  }, [environmentFilePathsKey]);
 
   useEffect(() => {
     const draftRequirements = collectEnvironmentRequirements(stories, {});
@@ -124,7 +132,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stories, environmentSettings.envFilePath]);
+  }, [stories, environmentFilePathsKey]);
 
   const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
   const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;

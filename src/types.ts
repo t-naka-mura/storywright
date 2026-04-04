@@ -30,13 +30,15 @@ export interface StoryDocument {
 }
 
 export interface EnvironmentSettings {
+  envFilePaths?: string[];
   envFilePath?: string;
 }
 
 export interface EnvironmentSourceStatus {
-  mode: "process-env" | "env-file";
-  envFilePath?: string;
+  mode: "process-env" | "env-files";
+  envFilePaths?: string[];
   loadedVariableCount: number;
+  loadedFileCount: number;
   error?: string;
 }
 

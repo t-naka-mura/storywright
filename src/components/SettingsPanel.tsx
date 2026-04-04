@@ -2,6 +2,20 @@ import { useEffect, useState } from "react";
 import type { EnvironmentSettings, EnvironmentSourceStatus } from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
+function getEnvironmentFilePaths(settings: EnvironmentSettings): string[] {
+  if (settings.envFilePaths && settings.envFilePaths.length > 0) {
+    return settings.envFilePaths;
+  }
+  return settings.envFilePath ? [settings.envFilePath] : [];
+}
+
+function parseEnvironmentFilePaths(draft: string): string[] {
+  return draft
+    .split("\n")
+    .map((envFilePath) => envFilePath.trim())
+    .filter((envFilePath, index, array) => envFilePath.length > 0 && array.indexOf(envFilePath) === index);
+}
+
 interface SettingsPanelProps {
   requirements: EnvironmentRequirement[];
   environmentSettings: EnvironmentSettings;
@@ -20,11 +34,12 @@ export function SettingsPanel({
   onChooseEnvironmentFile,
 }: SettingsPanelProps) {
   const missingCount = requirements.filter((requirement) => requirement.status === "missing").length;
-  const [envFilePathDraft, setEnvFilePathDraft] = useState(environmentSettings.envFilePath ?? "");
+  const [envFilePathsDraft, setEnvFilePathsDraft] = useState(getEnvironmentFilePaths(environmentSettings).join("\n"));
+  const activeEnvFilePaths = getEnvironmentFilePaths(environmentSettings);
 
   useEffect(() => {
-    setEnvFilePathDraft(environmentSettings.envFilePath ?? "");
-  }, [environmentSettings.envFilePath]);
+    setEnvFilePathsDraft(activeEnvFilePaths.join("\n"));
+  }, [activeEnvFilePaths.join("\n")]);
 
   return (
     <section className="settings-panel" aria-label="Settings">
@@ -67,42 +82,48 @@ export function SettingsPanel({
               <div className="settings-section-header">
                 <h3 className="settings-subsection-title">Environment Source</h3>
                 <p className="settings-section-description">
-                  `.env` ファイルを指定すると、同名の値は `process.env` より優先して解決されます。
+                  `.env` ファイルを上から順に読み込みます。後ろの file ほど優先され、すべて `process.env` より優先して解決されます。
                 </p>
               </div>
               <div className="settings-source-row">
-                <input
+                <textarea
                   className="settings-source-input"
-                  value={envFilePathDraft}
-                  onChange={(event) => setEnvFilePathDraft(event.target.value)}
-                  placeholder="/path/to/.env"
+                  value={envFilePathsDraft}
+                  onChange={(event) => setEnvFilePathsDraft(event.target.value)}
+                  placeholder={`/path/to/.env\n/path/to/.env.local`}
+                  rows={3}
                 />
                 <button className="btn" type="button" onClick={async () => {
                   const selected = await onChooseEnvironmentFile();
                   if (!selected) return;
-                  setEnvFilePathDraft(selected);
-                  await onSaveEnvironmentSettings({ envFilePath: selected });
+                  const nextPaths = [...parseEnvironmentFilePaths(envFilePathsDraft), selected]
+                    .filter((envFilePath, index, array) => array.indexOf(envFilePath) === index);
+                  setEnvFilePathsDraft(nextPaths.join("\n"));
+                  await onSaveEnvironmentSettings(nextPaths.length > 0 ? { envFilePaths: nextPaths } : {});
                 }}>
                   Browse
                 </button>
                 <button
                   className="btn"
                   type="button"
-                  onClick={() => onSaveEnvironmentSettings({ envFilePath: envFilePathDraft || undefined })}
+                  onClick={() => {
+                    const nextPaths = parseEnvironmentFilePaths(envFilePathsDraft);
+                    return onSaveEnvironmentSettings(nextPaths.length > 0 ? { envFilePaths: nextPaths } : {});
+                  }}
                 >
                   Save
                 </button>
               </div>
               <div className="settings-source-meta-row">
                 <span className="settings-source-meta">
-                  {environmentSettings.envFilePath ? `Using ${environmentSettings.envFilePath}` : "Using process.env only"}
+                  {activeEnvFilePaths.length > 0 ? `Using ${activeEnvFilePaths.length} files in order` : "Using process.env only"}
                 </span>
-                {environmentSettings.envFilePath && (
+                {activeEnvFilePaths.length > 0 && (
                   <button
                     className="settings-text-button"
                     type="button"
                     onClick={() => {
-                      setEnvFilePathDraft("");
+                      setEnvFilePathsDraft("");
                       void onSaveEnvironmentSettings({});
                     }}
                   >
@@ -110,19 +131,31 @@ export function SettingsPanel({
                   </button>
                 )}
               </div>
+              {activeEnvFilePaths.length > 0 && (
+                <div className="settings-source-path-list" role="list" aria-label="Configured environment files">
+                  {activeEnvFilePaths.map((envFilePath, index) => (
+                    <div key={envFilePath} className="settings-source-path-item" role="listitem">
+                      <span className="settings-source-path-index">{index + 1}</span>
+                      <span className="settings-source-path-text">{envFilePath}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {environmentSourceStatus && (
                 <div className="settings-source-status-row">
                   <span className={`settings-source-status-badge ${environmentSourceStatus.error ? "settings-source-status-badge-error" : "settings-source-status-badge-ok"}`}>
                     {environmentSourceStatus.error
                       ? "Load failed"
-                      : environmentSourceStatus.mode === "env-file"
-                        ? ".env active"
+                      : environmentSourceStatus.mode === "env-files"
+                        ? `${environmentSourceStatus.loadedFileCount} files active`
                         : "process.env"}
                   </span>
                   <span className="settings-source-meta">
                     {environmentSourceStatus.error
                       ? "設定を確認してください"
-                      : `${environmentSourceStatus.loadedVariableCount} variables available`}
+                      : environmentSourceStatus.mode === "env-files"
+                        ? `${environmentSourceStatus.loadedVariableCount} variables available after ${environmentSourceStatus.loadedFileCount} layers`
+                        : `${environmentSourceStatus.loadedVariableCount} variables available`}
                   </span>
                 </div>
               )}

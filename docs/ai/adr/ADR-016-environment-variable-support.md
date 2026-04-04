@@ -14,20 +14,19 @@
 - Settings surface での `available` / `missing` 可視化
 - 実行前に `missing` を検知して block し、Settings を案内する導線
 - Step 編集中 / Base URL 編集中に `ENV.*` 利用を示し、Settings を開ける導線
-- 単一 `.env` ファイルパスの指定と、その値を `process.env` より優先して解決する基盤
+- 複数 `.env` ファイルパスの指定と、その値を `process.env` より優先して解決する基盤
 - `.env` 読み込み成功/失敗を Settings 上で確認できる status 表示
 
 ### まだ未実装
 
 - `.env` ファイルの存在確認・検証 UX の改善
-- 複数 `.env` ファイル対応（`.env`, `.env.local`, `.env.production` 等）
 - `{{ENV.*}}` を含む step への `sensitive: true` 自動提案の強化
 - import/export 時の setup guide 生成
 
 ### 現在地
 
 ADR-016 の Phase 1 は概ね実装済み。
-Phase 2 も最小形として「単一 `.env` ファイル指定」は着手済みで、未完了なのは複数ファイル対応と UX の磨き込みである。
+Phase 2 も最小形を越えて、ordered な複数 `.env` ファイル指定まで実装済みである。未完了なのは validation UX と setup 導線の磨き込みである。
 
 ## Context (背景)
 
@@ -136,14 +135,14 @@ ADR-017 は Story の保存境界と export/import の責務を定義する ADR 
 
 ### Phase 2: .env ファイルサポート
 
-- 設定画面で `.env` ファイルパスを指定可能にする
-- 指定がある場合、`process.env` より `.env` ファイルの値を優先
+- 設定画面で `.env` ファイルパスを順序付きで指定可能にする
+- 指定がある場合、`process.env` より `.env` ファイル群の値を優先
 - 複数ファイル対応（`.env`, `.env.local`, `.env.production` 等）
 
 実装状況:
 
-- 単一ファイルのパス指定と優先解決は実装済み
-- 複数ファイル対応は未着手
+- 複数ファイルのパス指定と優先解決は実装済み
+- 追加で必要なのは validation UX と導線改善
 
 ## テスト戦略
 

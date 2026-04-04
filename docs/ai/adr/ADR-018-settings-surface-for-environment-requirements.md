@@ -14,7 +14,7 @@
 - 左 navigation を含む settings window の基本レイアウト
 - 実行前ダイアログから `Settings` を開く導線
 - Step / Base URL 編集中に `Settings` を開く導線
-- `.env` ファイルパスを保存する最小 UI
+- ordered な `.env` ファイルパス群を保存する最小 UI
 - `.env` source の読み込み状態と利用変数数を表示する status UI
 
 ### まだ未実装
@@ -27,7 +27,7 @@
 ### 現在地
 
 ADR-018 の Phase 1 は最小成立している。
-加えて `.env` パス指定の最小 UI まで入ったが、現状はまだ diagnostics 中心であり、settings platform としては初期段階である。
+加えて ordered な `.env` パス指定の最小 UI まで入ったが、現状はまだ diagnostics 中心であり、settings platform としては初期段階である。
 
 ## Context (背景)
 
@@ -124,7 +124,7 @@ Settings surface に次を表示する。
 
 ### Phase 2 以降の拡張候補
 
-- `.env` ファイルの指定
+- `.env` ファイル群の指定
 - local secret store に保存された値の編集
 - 実行前の設定検証導線
 - URL 履歴や preview 設定など、他の local app settings の集約
@@ -132,7 +132,7 @@ Settings surface に次を表示する。
 実装状況:
 
 - 実行前の設定検証導線は一部実装済み
-- `.env` ファイル指定は最小形のみ実装済み
+- `.env` ファイル群指定は最小形まで実装済み
 - その他は未着手
 
 ## UI 方針

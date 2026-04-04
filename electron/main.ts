@@ -14,6 +14,7 @@ const LOCAL_STATE_FILENAMES = {
 } as const;
 
 type EnvironmentSettings = {
+  envFilePaths?: string[];
   envFilePath?: string;
 };
 

@@ -106,6 +106,7 @@ export interface StorywrightAPI {
   saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
   getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
+  openSettingsWindow: () => Promise<void>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRun: () => Promise<void>;

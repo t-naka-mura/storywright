@@ -6,13 +6,24 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
 import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
-import { collectEnvironmentRequirements, type EnvironmentRequirement } from "./lib/environmentRequirements";
+import {
+  collectEnvironmentRequirements,
+  getMissingEnvironmentRequirementsForStory,
+  type EnvironmentRequirement,
+} from "./lib/environmentRequirements";
 import { useUrlHistory } from "./hooks/useUrlHistory";
 import { createStep, createStoryMetadata, normalizeStoriesData, normalizeStory, serializeStories } from "./lib/storyDocument";
 import "./App.css";
 
 const defaultStories: Record<string, Story> = {};
 const isSettingsWindow = window.location.hash === "#/settings";
+
+type AppErrorState = {
+  title: string;
+  message: string;
+  primaryActionLabel?: string;
+  onPrimaryAction?: () => void;
+};
 
 let storyIdCounter = 0;
 
@@ -23,7 +34,7 @@ function App() {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory } = useUrlHistory();
-  const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const [error, setError] = useState<AppErrorState | null>(null);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
@@ -94,7 +105,38 @@ function App() {
     setStories((prev) => ({ ...prev, [story.id]: normalizeStory(story) }));
   }, []);
 
+  const handleOpenSettingsWindow = useCallback(() => {
+    window.storywright.openSettingsWindow().catch(() => {});
+  }, []);
+
+  const ensureEnvironmentRequirementsAvailable = useCallback((story: Story) => {
+    const envMap = Object.fromEntries(
+      environmentRequirements.map((requirement) => [
+        requirement.name,
+        requirement.status === "available" ? "present" : undefined,
+      ]),
+    ) as Record<string, string | undefined>;
+    const missingRequirements = getMissingEnvironmentRequirementsForStory(story, envMap);
+
+    if (missingRequirements.length === 0) {
+      return true;
+    }
+
+    const missingNames = missingRequirements.map((requirement) => requirement.displayName).join("\n");
+    setError({
+      title: "環境変数が不足しています",
+      message: `この Story の実行に必要な環境変数が不足しています。\n\n${missingNames}\n\nSettings... を開いて不足項目を確認してください。`,
+      primaryActionLabel: "Settings を開く",
+      onPrimaryAction: handleOpenSettingsWindow,
+    });
+    return false;
+  }, [environmentRequirements, handleOpenSettingsWindow]);
+
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
+    if (!ensureEnvironmentRequirementsAvailable(story)) {
+      return;
+    }
+
     runCancelledRef.current = false;
     setIsRunning(true);
     const effectiveBaseUrl = story.baseUrl || baseUrl;
@@ -145,9 +187,13 @@ function App() {
       }
       unsubStep();
     }
-  }, [baseUrl, addUrlToHistory]);
+  }, [baseUrl, addUrlToHistory, ensureEnvironmentRequirementsAvailable]);
 
   const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number, keepSession: boolean) => {
+    if (!ensureEnvironmentRequirementsAvailable(story)) {
+      return;
+    }
+
     setIsRunning(true);
     const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
@@ -180,7 +226,7 @@ function App() {
       unsubRepeatRef.current?.();
       unsubRepeatRef.current = null;
     }
-  }, [baseUrl, addUrlToHistory]);
+  }, [baseUrl, addUrlToHistory, ensureEnvironmentRequirementsAvailable]);
 
   const handleCancelRepeat = useCallback(async () => {
     try {
@@ -369,6 +415,8 @@ function App() {
         <ErrorDialog
           title={error.title}
           message={error.message}
+          primaryActionLabel={error.primaryActionLabel}
+          onPrimaryAction={error.onPrimaryAction}
           onClose={() => setError(null)}
         />
       )}

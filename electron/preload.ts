@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("stories:load"),
   getEnvironmentVariablePresence: (names: string[]) =>
     ipcRenderer.invoke("environment:get-presence", names),
+  openSettingsWindow: () =>
+    ipcRenderer.invoke("app:open-settings"),
   saveLocalState: (key: "urlHistory", data: unknown) =>
     ipcRenderer.invoke("local-state:save", key, data),
   loadLocalState: (key: "urlHistory") =>

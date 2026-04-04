@@ -932,6 +932,10 @@ function teardownRecorder() {
 // === IPC Handlers ===
 
 function registerIpcHandlers() {
+  ipcMain.handle("app:open-settings", async () => {
+    openSettingsWindow();
+  });
+
   ipcMain.handle("stories:save", async (_event, data: unknown) => {
     saveStories(data);
   });

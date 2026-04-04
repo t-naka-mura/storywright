@@ -17,6 +17,14 @@ export interface EnvironmentRequirement {
   stories: EnvironmentRequirementUsage[];
 }
 
+export function getMissingEnvironmentRequirementsForStory(
+  story: Story,
+  env: Record<string, string | undefined> = {},
+): EnvironmentRequirement[] {
+  return collectEnvironmentRequirements({ [story.id]: story }, env)
+    .filter((requirement) => requirement.status === "missing");
+}
+
 export function extractEnvironmentVariableNames(text: string): string[] {
   const found = new Set<string>();
 

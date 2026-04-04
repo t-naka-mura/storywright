@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Story } from "../types";
-import { collectEnvironmentRequirements, extractEnvironmentVariableNames } from "./environmentRequirements";
+import {
+  collectEnvironmentRequirements,
+  extractEnvironmentVariableNames,
+  getMissingEnvironmentRequirementsForStory,
+} from "./environmentRequirements";
 import { createStep, createStoryMetadata } from "./storyDocument";
 
 function createStory(id: string, title: string, overrides?: Partial<Story>): Story {
@@ -114,5 +118,27 @@ describe("collectEnvironmentRequirements", () => {
     };
 
     expect(collectEnvironmentRequirements(stories, {})).toEqual([]);
+  });
+});
+
+describe("getMissingEnvironmentRequirementsForStory", () => {
+  it("対象 Story の missing requirements のみ返す", () => {
+    const story = createStory("login", "Login", {
+      baseUrl: "https://{{ENV.HOST}}",
+      steps: [
+        createStep({ id: "step-1", order: 1, action: "type", target: "#user", value: "{{ENV.USERNAME}}" }),
+        createStep({ id: "step-2", order: 2, action: "type", target: "#pass", value: "{{ENV.PASSWORD}}" }),
+      ],
+    });
+
+    expect(getMissingEnvironmentRequirementsForStory(story, { HOST: "example.com", USERNAME: "admin" })).toEqual([
+      {
+        name: "PASSWORD",
+        displayName: "ENV.PASSWORD",
+        status: "missing",
+        occurrenceCount: 1,
+        stories: [{ storyId: "login", storyTitle: "Login" }],
+      },
+    ]);
   });
 });

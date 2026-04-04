@@ -24,7 +24,6 @@ export function Toolbar({
       <div className="toolbar-left">
         <img src="/logo.svg" alt="" className="toolbar-logo" />
         <span className="toolbar-title">Storywright</span>
-        {/* ADR-015: Canvas タブ・Import ボタンは一時非表示 */}
       </div>
       <div className="toolbar-right">
         {isRecording ? (
@@ -55,8 +54,7 @@ export function Toolbar({
             >
               ● REC
             </button>
-          )
-        }
+          )}
         <button className="btn btn-panel-toggle" type="button" onClick={onTogglePanel} title={isPanelOpen ? "パネルを閉じる" : "パネルを開く"}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="1.5" y="2" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />

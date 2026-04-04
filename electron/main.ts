@@ -1,8 +1,9 @@
-const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView } = require("electron");
+import { resolveStoryEnvironmentVariables } from "./resolveEnvPlaceholders";
+import { prepareStoriesForPersistence, hydrateStoriesWithSecrets } from "./storySecrets";
+
+const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { resolveStoryEnvironmentVariables } = require("./resolveEnvPlaceholders");
-const { prepareStoriesForPersistence, hydrateStoriesWithSecrets } = require("./storySecrets");
 
 const STORIES_FILENAME = "stories.json";
 const STORY_SECRETS_FILENAME = "storySecrets.json";
@@ -133,11 +134,120 @@ function loadLocalState<T>(key: keyof typeof LOCAL_STATE_FILENAMES, fallback: T)
 }
 
 let mainWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
 let isRecording = false;
 let recordingWebContentsIds: number[] = [];
 let previewTabIdCounter = 0;
 let activePreviewTabId: string | null = null;
 let previewBounds = { x: 0, y: 0, width: 0, height: 0 };
+
+function loadWindowContents(targetWindow: Electron.BrowserWindow, hash = "") {
+  if (process.env.VITE_DEV_SERVER_URL) {
+    targetWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}${hash}`);
+    return;
+  }
+
+  targetWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+    hash: hash.replace(/^#/, ""),
+  });
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.focus();
+}
+
+function openSettingsWindow() {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    if (settingsWindow.isMinimized()) {
+      settingsWindow.restore();
+    }
+    settingsWindow.focus();
+    return;
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 920,
+    height: 760,
+    minWidth: 760,
+    minHeight: 560,
+    title: "Settings - Storywright",
+    parent: mainWindow ?? undefined,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: true,
+    },
+  });
+
+  loadWindowContents(settingsWindow, "#/settings");
+  settingsWindow.on("closed", () => {
+    settingsWindow = null;
+  });
+}
+
+function buildApplicationMenu() {
+  const isMac = process.platform === "darwin";
+  const settingsItem = {
+    label: "Settings...",
+    accelerator: "CmdOrCtrl+,",
+    click: () => openSettingsWindow(),
+  };
+
+  const template = [
+    ...(isMac
+      ? [{
+          label: app.name,
+          submenu: [
+            { role: "about" },
+            { type: "separator" },
+            settingsItem,
+            { type: "separator" },
+            { role: "services" },
+            { type: "separator" },
+            { role: "hide" },
+            { role: "hideOthers" },
+            { role: "unhide" },
+            { type: "separator" },
+            { role: "quit" },
+          ],
+        }]
+      : []),
+    {
+      label: "File",
+      submenu: [
+        ...(!isMac ? [settingsItem] : []),
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { label: "Main Window", accelerator: "CmdOrCtrl+1", click: () => focusMainWindow() },
+        { label: "Settings", accelerator: "CmdOrCtrl+2", click: () => openSettingsWindow() },
+        { type: "separator" },
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...(isMac ? [{ type: "separator" }, { role: "front" }] : [{ role: "close" }]),
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
 
 interface PreviewTab {
   id: string;
@@ -168,6 +278,36 @@ function getActivePreviewContents(): Electron.WebContents | null {
   return getActivePreviewTab()?.view.webContents ?? null;
 }
 
+function canNavigateBack(wc: Electron.WebContents): boolean {
+  if (typeof wc.navigationHistory?.canGoBack === "function") {
+    return wc.navigationHistory.canGoBack();
+  }
+  return wc.canGoBack();
+}
+
+function canNavigateForward(wc: Electron.WebContents): boolean {
+  if (typeof wc.navigationHistory?.canGoForward === "function") {
+    return wc.navigationHistory.canGoForward();
+  }
+  return wc.canGoForward();
+}
+
+function navigateBack(wc: Electron.WebContents): void {
+  if (typeof wc.navigationHistory?.goBack === "function") {
+    wc.navigationHistory.goBack();
+    return;
+  }
+  wc.goBack();
+}
+
+function navigateForward(wc: Electron.WebContents): void {
+  if (typeof wc.navigationHistory?.goForward === "function") {
+    wc.navigationHistory.goForward();
+    return;
+  }
+  wc.goForward();
+}
+
 function getPreviewState() {
   return {
     tabs: previewTabs.map((tab) => {
@@ -177,8 +317,8 @@ function getPreviewState() {
         title: tab.title,
         url: tab.url,
         loading: tab.loading,
-        canGoBack: !wc.isDestroyed() ? wc.canGoBack() : false,
-        canGoForward: !wc.isDestroyed() ? wc.canGoForward() : false,
+        canGoBack: !wc.isDestroyed() ? canNavigateBack(wc) : false,
+        canGoForward: !wc.isDestroyed() ? canNavigateForward(wc) : false,
       };
     }),
     activeTabId: activePreviewTabId,
@@ -428,6 +568,7 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
+    title: "Storywright",
     icon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -437,14 +578,13 @@ function createMainWindow() {
     },
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
-  }
+  loadWindowContents(mainWindow);
 
   mainWindow.on("closed", () => {
     destroyPreviewTabs();
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+      settingsWindow.close();
+    }
     mainWindow = null;
   });
 }
@@ -800,6 +940,12 @@ function registerIpcHandlers() {
     return loadStories(null);
   });
 
+  ipcMain.handle("environment:get-presence", async (_event, names: string[]) => {
+    return Object.fromEntries(
+      names.map((name) => [name, process.env[name] !== undefined]),
+    );
+  });
+
   ipcMain.handle("local-state:save", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown) => {
     saveLocalState(key, data);
   });
@@ -849,15 +995,15 @@ function registerIpcHandlers() {
 
   ipcMain.handle("preview:go-back", async () => {
     const wc = getActivePreviewContents();
-    if (wc?.canGoBack()) {
-      wc.goBack();
+    if (wc && canNavigateBack(wc)) {
+      navigateBack(wc);
     }
   });
 
   ipcMain.handle("preview:go-forward", async () => {
     const wc = getActivePreviewContents();
-    if (wc?.canGoForward()) {
-      wc.goForward();
+    if (wc && canNavigateForward(wc)) {
+      navigateForward(wc);
     }
   });
 
@@ -1287,6 +1433,8 @@ function registerIpcHandlers() {
 // === App Lifecycle ===
 
 app.whenReady().then(() => {
+  app.setName("Storywright");
+  buildApplicationMenu();
   registerIpcHandlers();
   createMainWindow();
 });

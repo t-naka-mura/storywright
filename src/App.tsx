@@ -2,14 +2,17 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Toolbar } from "./components/Toolbar";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { DetailPanel } from "./components/DetailPanel";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
 import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
+import { collectEnvironmentRequirements, type EnvironmentRequirement } from "./lib/environmentRequirements";
 import { useUrlHistory } from "./hooks/useUrlHistory";
 import { createStep, createStoryMetadata, normalizeStoriesData, normalizeStory, serializeStories } from "./lib/storyDocument";
 import "./App.css";
 
 const defaultStories: Record<string, Story> = {};
+const isSettingsWindow = window.location.hash === "#/settings";
 
 let storyIdCounter = 0;
 
@@ -28,6 +31,7 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [isAssertMode, setIsAssertMode] = useState(false);
   const [recordedStepCount, setRecordedStepCount] = useState(0);
+  const [environmentRequirements, setEnvironmentRequirements] = useState<EnvironmentRequirement[]>([]);
   const unsubRecorderRef = useRef<(() => void) | null>(null);
   const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
@@ -48,6 +52,40 @@ function App() {
     if (!dataLoaded) return;
     window.storywright.saveStories(serializeStories(stories));
   }, [stories, dataLoaded]);
+
+  useEffect(() => {
+    const draftRequirements = collectEnvironmentRequirements(stories, {});
+    if (draftRequirements.length === 0) {
+      setEnvironmentRequirements([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadEnvironmentPresence() {
+      const presence = await window.storywright.getEnvironmentVariablePresence(
+        draftRequirements.map((requirement) => requirement.name),
+      );
+
+      if (cancelled) return;
+
+      const envMap = Object.fromEntries(
+        Object.entries(presence).map(([name, isAvailable]) => [name, isAvailable ? "present" : undefined]),
+      ) as Record<string, string | undefined>;
+
+      setEnvironmentRequirements(collectEnvironmentRequirements(stories, envMap));
+    }
+
+    loadEnvironmentPresence().catch(() => {
+      if (!cancelled) {
+        setEnvironmentRequirements(draftRequirements);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stories]);
 
   const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
   const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;
@@ -272,6 +310,14 @@ function App() {
   // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
   const previewUrl = isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
+  if (isSettingsWindow) {
+    return (
+      <div className="settings-window-layout">
+        <SettingsPanel requirements={environmentRequirements} />
+      </div>
+    );
+  }
+
   return (
     <div className="app-layout">
       <Toolbar
@@ -285,36 +331,38 @@ function App() {
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
       />
       <div className="main-area">
-        <div style={{ display: "flex", flex: 1 }}>
-          <PreviewPanel
-            url={previewUrl}
-            isRecording={isRecording}
+        <>
+          <div style={{ display: "flex", flex: 1 }}>
+            <PreviewPanel
+              url={previewUrl}
+              isRecording={isRecording}
+              isRunning={isRunning}
+              recordedStepCount={recordedStepCount}
+              onUrlChange={setBaseUrl}
+              urlHistory={urlHistory}
+              onDeleteUrlHistory={deleteUrlFromHistory}
+              onUrlLoaded={addUrlToHistory}
+            />
+          </div>
+          <DetailPanel
+            isOpen={isPanelOpen}
+            story={selectedStory}
+            storyResult={selectedResult}
+            onUpdateStory={handleUpdateStory}
+            onRunStory={handleRunStory}
+            onRunStoryRepeat={handleRunStoryRepeat}
+            onCancelRun={handleCancelRun}
+            onCancelRepeat={handleCancelRepeat}
             isRunning={isRunning}
-            recordedStepCount={recordedStepCount}
-            onUrlChange={setBaseUrl}
-            urlHistory={urlHistory}
-            onDeleteUrlHistory={deleteUrlFromHistory}
-            onUrlLoaded={addUrlToHistory}
+            repeatProgress={repeatProgress}
+            repeatResult={repeatResult}
+            standaloneStories={standaloneStories}
+            storyResults={results}
+            onSelectStory={setSelectedStoryId}
+            onDeselectStory={handleDeselectStory}
+            onDeleteStory={handleDeleteStory}
           />
-        </div>
-        <DetailPanel
-          isOpen={isPanelOpen}
-          story={selectedStory}
-          storyResult={selectedResult}
-          onUpdateStory={handleUpdateStory}
-          onRunStory={handleRunStory}
-          onRunStoryRepeat={handleRunStoryRepeat}
-          onCancelRun={handleCancelRun}
-          onCancelRepeat={handleCancelRepeat}
-          isRunning={isRunning}
-          repeatProgress={repeatProgress}
-          repeatResult={repeatResult}
-          standaloneStories={standaloneStories}
-          storyResults={results}
-          onSelectStory={setSelectedStoryId}
-          onDeselectStory={handleDeselectStory}
-          onDeleteStory={handleDeleteStory}
-        />
+        </>
       </div>
       <StatusBar isRecording={isRecording} isAssertMode={isAssertMode} />
       {error && (

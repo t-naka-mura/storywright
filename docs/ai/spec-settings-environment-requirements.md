@@ -1,8 +1,8 @@
-# Settings 画面仕様: Environment Requirements
+# Settings surface 仕様: Environment Requirements
 
 ## 概要
 
-ADR-018 に基づき、Storywright に `Settings` 画面を追加する。
+ADR-018 に基づき、Storywright に `Settings` surface を追加する。
 
 この画面の初期目的は、Story 群で参照されている `{{ENV.*}}` 変数を一覧化し、現在の環境で `available` / `missing` を判定して表示すること。
 
@@ -32,7 +32,7 @@ ADR-018 に基づき、Storywright に `Settings` 画面を追加する。
 
 ## 画面構成
 
-### 画面名
+### surface 名
 
 - `Settings`
 
@@ -44,7 +44,8 @@ Phase 1 では次の 1 セクションのみを持つ。
 
 ### レイアウト方針
 
-- Story / Preview とは独立した画面または surface とする
+- Story / Preview とは独立責務の surface とする
+- 初期実装では app menu から開く独立 window を許容する
 - Warm Functional に従い、情報量は多くても威圧的に見せない
 - 「設定不足」は赤一色で煽らず、次のアクションが分かる表示にする
 
@@ -141,7 +142,7 @@ Phase 1 では次の 1 セクションのみを持つ。
 
 ### 1. 共有された Story を開いた直後
 
-- ユーザーが `Settings` を開く
+- ユーザーが `Settings` window を開く
 - 必要な `ENV.*` 一覧を見る
 - `missing` を確認し、外部で環境変数を設定する
 
@@ -173,7 +174,7 @@ Phase 1 では次の 1 セクションのみを持つ。
 
 - pure helper で `ENV.*` 抽出を実装する
 - UI は helper の結果だけを受け取る構成にする
-- `Settings` 画面は read-only で始める
+- `Settings` surface は read-only で始める
 
 ## 関連ドキュメント
 

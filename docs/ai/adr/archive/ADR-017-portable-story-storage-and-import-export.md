@@ -1,7 +1,7 @@
 # ADR-017: Portable Story Storage と Import/Export 境界
 
 - 日付: 2026-04-04
-- ステータス: 提案
+- ステータス: 承認済み（実装完了）
 
 ## Context (背景)
 

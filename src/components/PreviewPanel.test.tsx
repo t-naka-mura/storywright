@@ -43,6 +43,7 @@ describe("PreviewPanel", () => {
     const api: StorywrightAPI = {
       saveStories: vi.fn(async () => {}),
       loadStories: vi.fn(async () => null),
+      getEnvironmentVariablePresence: vi.fn(async () => ({})),
       saveLocalState: vi.fn(async () => {}),
       loadLocalState: vi.fn(async () => null),
       runStory: vi.fn(async () => createStoryResult()),

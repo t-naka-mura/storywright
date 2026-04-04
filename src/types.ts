@@ -30,6 +30,9 @@ export interface StoryDocument {
 }
 
 export type LocalStateKey = "urlHistory";
+export type AppView = "story" | "settings";
+
+export type EnvironmentPresenceMap = Record<string, boolean>;
 
 export type StepResult = {
   order: number;
@@ -102,6 +105,7 @@ export interface StorywrightAPI {
   loadStories: () => Promise<unknown>;
   saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
+  getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRun: () => Promise<void>;

@@ -73,6 +73,12 @@ export function PreviewPanel({
     window.addEventListener("resize", syncBounds);
 
     return () => {
+      window.storywright.setPreviewBounds({
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+      }).catch(() => {});
       observer.disconnect();
       window.removeEventListener("resize", syncBounds);
     };

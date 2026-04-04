@@ -102,7 +102,7 @@ interface Step {
 ## 関連ドキュメント
 
 - [design-philosophy.md](design-philosophy.md) — デザイン思想（Warm Functional）
-- [spec-settings-environment-requirements.md](spec-settings-environment-requirements.md) — Settings 画面の最小仕様
+- [spec-settings-environment-requirements.md](spec-settings-environment-requirements.md) — Settings surface の最小仕様
 - [docs/ai/index.md](index.md) — docs/ai 運用ガイド
 
 ### ADR（アクティブ）
@@ -111,7 +111,7 @@ interface Step {
 - [ADR-013](adr/ADR-013-multi-tab-preview.md) — Preview の複数タブ対応
 - [ADR-016](adr/ADR-016-environment-variable-support.md) — ステップ値での環境変数参照サポート
 - [ADR-017](adr/ADR-017-portable-story-storage-and-import-export.md) — Portable Story Storage と Import/Export 境界
-- [ADR-018](adr/ADR-018-settings-surface-for-environment-requirements.md) — Environment Requirements を表示する Settings 画面
+- [ADR-018](adr/ADR-018-settings-surface-for-environment-requirements.md) — Environment Requirements を表示する Settings surface
 
 ### ADR（アーカイブ）
 

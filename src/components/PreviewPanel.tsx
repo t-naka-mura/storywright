@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { PreviewState, PreviewTabState } from "../types";
 
+let pendingInitialPreviewUrl: string | null = null;
+
 interface PreviewPanelProps {
   url: string;
   isRecording: boolean;
@@ -83,6 +85,12 @@ export function PreviewPanel({
   }, [activeTab?.id, activeTab?.url, url, isEditing]);
 
   useEffect(() => {
+    if (previewState.tabs.length > 0 || previewState.activeTabId) {
+      pendingInitialPreviewUrl = null;
+    }
+  }, [previewState.tabs.length, previewState.activeTabId]);
+
+  useEffect(() => {
     lastAppliedExternalUrlRef.current = null;
   }, [previewState.activeTabId]);
 
@@ -90,8 +98,13 @@ export function PreviewPanel({
     if (!url || !/^https?:\/\//.test(url) || isEditing) return;
     if (!previewState.activeTabId) {
       if (previewState.tabs.length > 0) return;
+      if (pendingInitialPreviewUrl === url) return;
+      pendingInitialPreviewUrl = url;
       lastAppliedExternalUrlRef.current = url;
       window.storywright.createPreviewTab(url).catch(() => {
+        if (pendingInitialPreviewUrl === url) {
+          pendingInitialPreviewUrl = null;
+        }
         lastAppliedExternalUrlRef.current = null;
       });
       return;

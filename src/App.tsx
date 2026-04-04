@@ -267,8 +267,8 @@ function App() {
   }, [stories]);
 
   const handleSaveEnvironmentSettings = useCallback(async (nextSettings: EnvironmentSettings) => {
-    await window.storywright.saveLocalState("environment", nextSettings);
     setEnvironmentSettings(nextSettings);
+    await window.storywright.saveLocalState("environment", nextSettings);
   }, []);
 
   const handleImportEnvironmentFile = useCallback(async () => {

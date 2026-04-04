@@ -110,7 +110,8 @@ export function SettingsPanel({
   const domains = getEnvironmentDomains(environmentSettings);
   const canAddEnvironment = domains.length < 10;
   const configuredValueCount = domains.reduce((count, domain) => count + (domain.values?.length ?? 0), 0);
-  const activeDomain = domains.find((domain) => domain.id === environmentSettings.activeDomainId) ?? domains[0] ?? null;
+  const [activeTabId, setActiveTabId] = useState(environmentSettings.activeDomainId ?? domains[0]?.id);
+  const activeDomain = domains.find((domain) => domain.id === activeTabId) ?? domains[0] ?? null;
   const envValuesKey = JSON.stringify(activeDomain?.values ?? []);
   const [domainNameDraft, setDomainNameDraft] = useState(activeDomain?.name ?? "");
   const [matchHostDraft, setMatchHostDraft] = useState(activeDomain?.matchHost ?? "");
@@ -129,11 +130,13 @@ export function SettingsPanel({
   const hasPendingMatchHostChange = activeDomain !== null && normalizedMatchHostDraft !== savedMatchHost;
   const hasPendingValueChanges =
     JSON.stringify(toEnvironmentDomainValues(environmentValueRows)) !== JSON.stringify(toEnvironmentDomainValues(savedValueRows));
+  const hasPendingActiveTabChange = activeTabId !== environmentSettings.activeDomainId;
 
-  function saveDomains(nextDomains: typeof domains, activeDomainId = activeDomain?.id ?? nextDomains[0]?.id) {
+  function saveDomains(nextDomains: typeof domains, nextActiveTabId = activeTabId ?? nextDomains[0]?.id) {
+    setActiveTabId(nextActiveTabId);
     return onSaveEnvironmentSettings({
       domains: nextDomains,
-      activeDomainId,
+      activeDomainId: nextActiveTabId,
     });
   }
 
@@ -193,18 +196,24 @@ export function SettingsPanel({
       return;
     }
 
-    if (!hasPendingDomainNameChange && !hasPendingMatchHostChange && (!hasPendingValueChanges || duplicateKeys.length > 0)) {
+    const hasPendingEdits = hasPendingDomainNameChange || hasPendingMatchHostChange || (hasPendingValueChanges && duplicateKeys.length === 0);
+
+    if (!hasPendingEdits && !hasPendingActiveTabChange) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      void updateActiveDomain({
-        ...(hasPendingDomainNameChange ? { name: normalizedDraftDomainName } : {}),
-        ...(hasPendingMatchHostChange ? { matchHost: normalizedMatchHostDraft } : {}),
-        ...(hasPendingValueChanges && duplicateKeys.length === 0
-          ? { values: toEnvironmentDomainValues(environmentValueRows) }
-          : {}),
-      });
+      if (hasPendingEdits) {
+        void updateActiveDomain({
+          ...(hasPendingDomainNameChange ? { name: normalizedDraftDomainName } : {}),
+          ...(hasPendingMatchHostChange ? { matchHost: normalizedMatchHostDraft } : {}),
+          ...(hasPendingValueChanges && duplicateKeys.length === 0
+            ? { values: toEnvironmentDomainValues(environmentValueRows) }
+            : {}),
+        });
+      } else {
+        void onSaveEnvironmentSettings({ domains, activeDomainId: activeTabId });
+      }
     }, 250);
 
     return () => {
@@ -212,8 +221,10 @@ export function SettingsPanel({
     };
   }, [
     activeDomain,
+    activeTabId,
     duplicateKeys.length,
     environmentValueRows,
+    hasPendingActiveTabChange,
     hasPendingDomainNameChange,
     hasPendingMatchHostChange,
     hasPendingValueChanges,
@@ -279,23 +290,23 @@ export function SettingsPanel({
                     role="tab"
                     aria-selected={domain.id === activeDomain?.id}
                     className={`settings-domain-tab ${domain.id === activeDomain?.id ? "settings-domain-tab-active" : ""}`}
+                    onClick={() => {
+                      setActiveTabId(domain.id);
+                    }}
                   >
-                    <button
-                      type="button"
+                    <span
                       className="settings-domain-tab-label"
                       title={domain.name}
-                      onClick={() => {
-                        void saveDomains(domains, domain.id);
-                      }}
                     >
                       {domain.name}
-                    </button>
+                    </span>
                     {domains.length > 1 && (
                       <button
                         type="button"
                         className="settings-domain-tab-close"
                         aria-label={`Delete LOCAL_ENV ${domain.name}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           const shouldDelete = window.confirm(`Delete LOCAL_ENV "${domain.name}"?`);
                           if (!shouldDelete) return;
 

@@ -102,7 +102,7 @@ describe("SettingsPanel", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderSettingsPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "US" }));
+    fireEvent.click(screen.getByRole("tab", { name: /US/ }));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("us-token")).toBeInTheDocument();

@@ -969,18 +969,19 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
     // 既にアタッチ済みの場合は無視
   }
 
-  // ページ遷移後も自動でスクリプトを再注入
-  wc.debugger.sendCommand("Page.enable");
+  // Page ドメインを有効化し、ページ遷移後もスクリプトを自動再注入
+  wc.debugger.sendCommand("Page.enable").catch(() => {});
   wc.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument", {
     source: RECORDER_INJECTION_SCRIPT,
-  });
+  }).catch(() => {});
 
   // 現在のページにも注入
   wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
 
-  // ドメイン跨ぎナビゲーション時にスクリプトを再注入
+  // ドメイン跨ぎナビゲーション時にスクリプト再注入 + Page ドメイン再有効化
   wc.on("did-navigate", () => {
     if (!isRecording) return;
+    wc.debugger.sendCommand("Page.enable").catch(() => {});
     wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
   });
 

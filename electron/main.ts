@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { prepareStoriesForPersistence, hydrateStoriesWithSecrets } = require("./storySecrets");
 
 const STORIES_FILENAME = "stories.json";
+const STORY_SECRETS_FILENAME = "storySecrets.json";
 const LOCAL_STATE_FILENAMES = {
   urlHistory: "urlHistory.json",
 } as const;
@@ -102,12 +104,23 @@ function loadFile<T>(filename: string, fallback: T): T {
 }
 
 function saveStories(data: unknown): void {
-  saveFile(STORIES_FILENAME, encryptSensitiveSteps(data));
+  const { stories, secrets } = prepareStoriesForPersistence(data);
+  const encryptedSecrets = Object.fromEntries(
+    Object.entries(secrets).map(([key, value]) => [key, encryptValue(value)]),
+  );
+
+  saveFile(STORIES_FILENAME, stories);
+  saveFile(STORY_SECRETS_FILENAME, encryptedSecrets);
 }
 
 function loadStories<T>(fallback: T): T {
-  const raw = loadFile(STORIES_FILENAME, fallback);
-  return decryptSensitiveSteps(raw) as T;
+  const rawStories = loadFile(STORIES_FILENAME, fallback);
+  const decryptedStories = decryptSensitiveSteps(rawStories);
+  const rawSecrets = loadFile<Record<string, string>>(STORY_SECRETS_FILENAME, {});
+  const decryptedSecrets = Object.fromEntries(
+    Object.entries(rawSecrets).map(([key, value]) => [key, decryptValue(value)]),
+  );
+  return hydrateStoriesWithSecrets(decryptedStories, decryptedSecrets) as T;
 }
 
 function saveLocalState(key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown): void {

@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("stories:load"),
   getEnvironmentVariablePresence: (names: string[]) =>
     ipcRenderer.invoke("environment:get-presence", names),
+  getEnvironmentSourceStatus: () =>
+    ipcRenderer.invoke("environment:get-source-status"),
   openSettingsWindow: () =>
     ipcRenderer.invoke("app:open-settings"),
   chooseEnvironmentFile: () =>

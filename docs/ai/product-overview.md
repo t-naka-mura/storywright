@@ -42,7 +42,17 @@
 
 ## データモデル
 
-### Story
+### StoryDocument（永続化フォーマット）
+
+```typescript
+interface StoryDocument {
+  schemaVersion: 1;
+  stories: Record<string, Story>;
+  exportedAt?: string;        // export 時のみ
+}
+```
+
+### Story / Step
 
 ```typescript
 interface Story {
@@ -50,15 +60,23 @@ interface Story {
   title: string;
   baseUrl?: string;
   steps: Step[];
-  createdAt?: number;
+  metadata: StoryMetadata;
+}
+
+interface StoryMetadata {
+  createdAt: number;
+  updatedAt?: number;
 }
 
 interface Step {
+  id: string;                 // ユニーク ID（差分比較・マージ用）
   order: number;
   action: "navigate" | "click" | "type" | "select" | "assert" | "wait" | "screenshot";
-  target: string;   // セレクタ or URL
-  value: string;
+  target: string;             // セレクタ or URL（{{ENV.*}} 対応）
+  value: string;              // 値（{{ENV.*}} 対応）
+  valueRef?: string;          // sensitive 値の local secret store 参照
   description: string;
+  sensitive?: boolean;
 }
 ```
 
@@ -72,13 +90,64 @@ interface Step {
 6. `id` 属性
 7. CSS セレクタ（フォールバック）
 
-### 永続化
+### 永続化（3層分離）
 
-| データ | 方式 | 場所 |
-|--------|------|------|
-| Story 定義 | JSON | `.storywright/stories.json` |
-| URL 履歴 | JSON | `.storywright/urlHistory.json` |
-| テスト結果 | React state（セッション中のみ） | メモリ |
+| データ | 方式 | ファイル | export 対象 |
+|--------|------|----------|-------------|
+| Story 定義 | JSON (StoryDocument) | `stories.json` | ✅ |
+| Sensitive 値 | 暗号化 JSON (safeStorage) | `storySecrets.json` | ❌ |
+| URL 履歴 | JSON | `urlHistory.json` | ❌ |
+| 環境設定 | JSON | `environment.json` | ❌ |
+| テスト結果 | React state | メモリ | ❌ |
+
+## 環境変数の解決フロー
+
+Story 実行時に `{{ENV.NAME}}` プレースホルダを実値に置換する。
+
+```
+[ユーザー] ── Run ──▶ [renderer]
+                        │
+                        │ IPC: run-story(storyJson)
+                        ▼
+                   [main process]
+                        │
+              ┌─────────┴─────────┐
+              ▼                   ▼
+        .env ファイル        process.env
+        (設定済みなら)
+              │                   │
+              └────── merge ──────┘
+                   .env が優先
+                        │
+                        ▼
+              resolveStoryEnvironmentVariables()
+              {{ENV.HOST}} → "example.com"
+              {{ENV.PASSWORD}} → "secret"
+                        │
+                        ▼
+                  CDP Runtime.evaluate
+                  (Preview webview 上で実行)
+```
+
+### 実行前チェック
+
+```
+[ユーザー] ── Run ──▶ [renderer]
+                        │
+                        │ IPC: environment:get-presence(names)
+                        ▼
+                   [main process]
+                        │ .env + process.env を確認
+                        ▼
+                  { HOST: true, PASSWORD: false }
+                        │
+                        ▼
+                   [renderer]
+                        │ missing があれば
+                        ▼
+                  エラーダイアログ
+                  「Settings を開く」ボタン
+```
 
 ## 実装済み機能
 
@@ -91,12 +160,21 @@ interface Step {
 - [x] 繰り返し実行（N回繰り返し + 成功/失敗サマリー）
 - [x] ブラウザバー（戻る/進む/リロード/URL履歴）
 - [x] URL 履歴のファイル永続化
+- [x] 複数タブ対応（`target="_blank"` / `window.open` / popup）
+- [x] Sensitive 値のマスキング・暗号化保存・secret store 分離
+- [x] Portable Story Storage（StoryDocument + schemaVersion + step.id + metadata）
+- [x] `{{ENV.*}}` 環境変数参照（実行時解決）
+- [x] `.env` ファイル読み込み（単一ファイル、process.env より優先）
+- [x] Settings window（環境変数 requirements の可視化）
+- [x] 実行前の環境変数不足チェック + Settings 導線
 
 ## 今後の検討事項
 
-- [ ] 複数タブ対応（ADR-013: `target="_blank"` 対応）
 - [ ] テスト結果の永続化
+- [ ] Story の export / import UI
 - [ ] Story 間のステップコピー&マージ（つぎはぎ E2E）
+- [ ] 複数 `.env` ファイル対応
+- [ ] `{{ENV.*}}` を含む step への sensitive 自動提案
 - [ ] Figma / Google Spreadsheet 連携（当面スコープ外）
 
 ## 関連ドキュメント
@@ -108,19 +186,8 @@ interface Step {
 ### ADR（アクティブ）
 
 - [ADR-011](adr/ADR-011-repeat-execution.md) — 繰り返し実行
-- [ADR-013](adr/ADR-013-multi-tab-preview.md) — Preview の複数タブ対応
 - [ADR-016](adr/ADR-016-environment-variable-support.md) — ステップ値での環境変数参照サポート
-- [ADR-017](adr/ADR-017-portable-story-storage-and-import-export.md) — Portable Story Storage と Import/Export 境界
 - [ADR-018](adr/ADR-018-settings-surface-for-environment-requirements.md) — Environment Requirements を表示する Settings surface
-
-### 実装メモ（2026-04-04）
-
-- ADR-016 Phase 1 は概ね実装済み
-- ADR-016 Phase 2 は単一 `.env` ファイル指定まで着手済み
-- ADR-018 Phase 1 は最小成立済み
-- Settings には `.env` パス指定の最小 UI が入っている
-- 未着手の中心は複数 `.env` 対応と settings の入力 UX 拡張
-- 詳細な実装済み / 未実装の境界は ADR-016, ADR-018 本文内の「実装進捗サマリ」を参照
 
 ### ADR（アーカイブ）
 

@@ -33,6 +33,13 @@ export interface EnvironmentSettings {
   envFilePath?: string;
 }
 
+export interface EnvironmentSourceStatus {
+  mode: "process-env" | "env-file";
+  envFilePath?: string;
+  loadedVariableCount: number;
+  error?: string;
+}
+
 export type LocalStateKey = "urlHistory" | "environment";
 export type AppView = "story" | "settings";
 
@@ -110,6 +117,7 @@ export interface StorywrightAPI {
   saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
   getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
+  getEnvironmentSourceStatus: () => Promise<EnvironmentSourceStatus>;
   openSettingsWindow: () => Promise<void>;
   chooseEnvironmentFile: () => Promise<string | null>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { EnvironmentSettings } from "../types";
+import type { EnvironmentSettings, EnvironmentSourceStatus } from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
 interface SettingsPanelProps {
   requirements: EnvironmentRequirement[];
   environmentSettings: EnvironmentSettings;
   environmentSettingsError: string | null;
+  environmentSourceStatus: EnvironmentSourceStatus | null;
   onSaveEnvironmentSettings: (settings: EnvironmentSettings) => Promise<void>;
   onChooseEnvironmentFile: () => Promise<string | null>;
 }
@@ -14,6 +15,7 @@ export function SettingsPanel({
   requirements,
   environmentSettings,
   environmentSettingsError,
+  environmentSourceStatus,
   onSaveEnvironmentSettings,
   onChooseEnvironmentFile,
 }: SettingsPanelProps) {
@@ -108,6 +110,22 @@ export function SettingsPanel({
                   </button>
                 )}
               </div>
+              {environmentSourceStatus && (
+                <div className="settings-source-status-row">
+                  <span className={`settings-source-status-badge ${environmentSourceStatus.error ? "settings-source-status-badge-error" : "settings-source-status-badge-ok"}`}>
+                    {environmentSourceStatus.error
+                      ? "Load failed"
+                      : environmentSourceStatus.mode === "env-file"
+                        ? ".env active"
+                        : "process.env"}
+                  </span>
+                  <span className="settings-source-meta">
+                    {environmentSourceStatus.error
+                      ? "設定を確認してください"
+                      : `${environmentSourceStatus.loadedVariableCount} variables available`}
+                  </span>
+                </div>
+              )}
               {environmentSettingsError && (
                 <div className="settings-inline-error" role="alert">
                   {environmentSettingsError}

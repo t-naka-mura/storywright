@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
+import {
+  inspectEnvironmentSource,
+  normalizeEnvironmentSettings,
+  resolveEnvironmentWithSettings,
+} from "./environmentConfig";
 
 describe("normalizeEnvironmentSettings", () => {
   it("空文字の envFilePath を除去する", () => {
@@ -40,5 +44,45 @@ describe("resolveEnvironmentWithSettings", () => {
         },
       ),
     ).toThrow("Failed to load .env file: ENOENT");
+  });
+});
+
+describe("inspectEnvironmentSource", () => {
+  it("process.env only の状態を返す", () => {
+    expect(inspectEnvironmentSource({ HOST: "example.com", TOKEN: "token" }, {})).toEqual({
+      mode: "process-env",
+      loadedVariableCount: 2,
+    });
+  });
+
+  it(".env 読み込み成功時は env-file 状態を返す", () => {
+    expect(
+      inspectEnvironmentSource(
+        { HOST: "process.example.com" },
+        { envFilePath: "/tmp/.env" },
+        () => "HOST=file.example.com\nTOKEN=file-token",
+      ),
+    ).toEqual({
+      mode: "env-file",
+      envFilePath: "/tmp/.env",
+      loadedVariableCount: 2,
+    });
+  });
+
+  it(".env 読み込み失敗時は error を返す", () => {
+    expect(
+      inspectEnvironmentSource(
+        {},
+        { envFilePath: "/missing/.env" },
+        () => {
+          throw new Error("ENOENT");
+        },
+      ),
+    ).toEqual({
+      mode: "env-file",
+      envFilePath: "/missing/.env",
+      loadedVariableCount: 0,
+      error: "Failed to load .env file: ENOENT",
+    });
   });
 });

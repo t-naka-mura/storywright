@@ -15,6 +15,7 @@
 - 実行前に `missing` を検知して block し、Settings を案内する導線
 - Step 編集中 / Base URL 編集中に `ENV.*` 利用を示し、Settings を開ける導線
 - 単一 `.env` ファイルパスの指定と、その値を `process.env` より優先して解決する基盤
+- `.env` 読み込み成功/失敗を Settings 上で確認できる status 表示
 
 ### まだ未実装
 

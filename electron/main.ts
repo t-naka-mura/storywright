@@ -1,6 +1,6 @@
 import { resolveStoryEnvironmentVariables } from "./resolveEnvPlaceholders";
 import { prepareStoriesForPersistence, hydrateStoriesWithSecrets } from "./storySecrets";
-import { normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
+import { inspectEnvironmentSource, normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
 
 const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu, dialog } = require("electron");
 const path = require("path");
@@ -980,6 +980,10 @@ function registerIpcHandlers() {
     return Object.fromEntries(
       names.map((name) => [name, resolvedEnv[name] !== undefined]),
     );
+  });
+
+  ipcMain.handle("environment:get-source-status", async () => {
+    return inspectEnvironmentSource(process.env, loadEnvironmentSettings());
   });
 
   ipcMain.handle("local-state:save", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown) => {

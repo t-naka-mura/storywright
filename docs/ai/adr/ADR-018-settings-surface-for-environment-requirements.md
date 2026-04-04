@@ -15,6 +15,7 @@
 - 実行前ダイアログから `Settings` を開く導線
 - Step / Base URL 編集中に `Settings` を開く導線
 - `.env` ファイルパスを保存する最小 UI
+- `.env` source の読み込み状態と利用変数数を表示する status UI
 
 ### まだ未実装
 

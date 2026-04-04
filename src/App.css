@@ -390,6 +390,34 @@ body,
   font-size: 12px;
 }
 
+.settings-source-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.settings-source-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.settings-source-status-badge-ok {
+  color: #20603a;
+  background: rgba(78, 173, 107, 0.16);
+}
+
+.settings-source-status-badge-error {
+  color: #8e4b21;
+  background: rgba(217, 135, 87, 0.18);
+}
+
 .settings-text-button {
   border: none;
   background: none;
@@ -541,7 +569,8 @@ body,
   }
 
   .settings-source-row,
-  .settings-source-meta-row {
+  .settings-source-meta-row,
+  .settings-source-status-row {
     flex-direction: column;
     align-items: stretch;
   }

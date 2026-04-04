@@ -5,7 +5,7 @@ import { DetailPanel } from "./components/DetailPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
-import type { EnvironmentSettings, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
+import type { EnvironmentSettings, EnvironmentSourceStatus, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import {
   collectEnvironmentRequirements,
   getMissingEnvironmentRequirementsForStory,
@@ -37,6 +37,7 @@ function App() {
   const [error, setError] = useState<AppErrorState | null>(null);
   const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({});
   const [environmentSettingsError, setEnvironmentSettingsError] = useState<string | null>(null);
+  const [environmentSourceStatus, setEnvironmentSourceStatus] = useState<EnvironmentSourceStatus | null>(null);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
@@ -69,6 +70,29 @@ function App() {
   }, [stories, dataLoaded]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadEnvironmentSourceStatus() {
+      try {
+        const status = await window.storywright.getEnvironmentSourceStatus();
+        if (cancelled) return;
+        setEnvironmentSourceStatus(status);
+        setEnvironmentSettingsError(status.error ?? null);
+      } catch (err) {
+        if (cancelled) return;
+        setEnvironmentSourceStatus(null);
+        setEnvironmentSettingsError(String(err));
+      }
+    }
+
+    loadEnvironmentSourceStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentSettings.envFilePath]);
+
+  useEffect(() => {
     const draftRequirements = collectEnvironmentRequirements(stories, {});
     if (draftRequirements.length === 0) {
       setEnvironmentRequirements([]);
@@ -88,13 +112,11 @@ function App() {
         Object.entries(presence).map(([name, isAvailable]) => [name, isAvailable ? "present" : undefined]),
       ) as Record<string, string | undefined>;
 
-      setEnvironmentSettingsError(null);
       setEnvironmentRequirements(collectEnvironmentRequirements(stories, envMap));
     }
 
     loadEnvironmentPresence().catch(() => {
       if (!cancelled) {
-        setEnvironmentSettingsError("選択された .env ファイルを読み込めませんでした。パスを確認してください。");
         setEnvironmentRequirements(draftRequirements);
       }
     });
@@ -396,6 +418,7 @@ function App() {
           requirements={environmentRequirements}
           environmentSettings={environmentSettings}
           environmentSettingsError={environmentSettingsError}
+          environmentSourceStatus={environmentSourceStatus}
           onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
           onChooseEnvironmentFile={handleChooseEnvironmentFile}
         />

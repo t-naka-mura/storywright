@@ -29,7 +29,11 @@ export interface StoryDocument {
   exportedAt?: string;
 }
 
-export type LocalStateKey = "urlHistory";
+export interface EnvironmentSettings {
+  envFilePath?: string;
+}
+
+export type LocalStateKey = "urlHistory" | "environment";
 export type AppView = "story" | "settings";
 
 export type EnvironmentPresenceMap = Record<string, boolean>;
@@ -107,6 +111,7 @@ export interface StorywrightAPI {
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
   getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
   openSettingsWindow: () => Promise<void>;
+  chooseEnvironmentFile: () => Promise<string | null>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRun: () => Promise<void>;

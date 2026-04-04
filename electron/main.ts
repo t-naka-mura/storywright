@@ -1,7 +1,8 @@
 import { resolveStoryEnvironmentVariables } from "./resolveEnvPlaceholders";
 import { prepareStoriesForPersistence, hydrateStoriesWithSecrets } from "./storySecrets";
+import { normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
 
-const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -9,7 +10,12 @@ const STORIES_FILENAME = "stories.json";
 const STORY_SECRETS_FILENAME = "storySecrets.json";
 const LOCAL_STATE_FILENAMES = {
   urlHistory: "urlHistory.json",
+  environment: "environment.json",
 } as const;
+
+type EnvironmentSettings = {
+  envFilePath?: string;
+};
 
 // === データ永続化 ===
 
@@ -131,6 +137,14 @@ function saveLocalState(key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown):
 
 function loadLocalState<T>(key: keyof typeof LOCAL_STATE_FILENAMES, fallback: T): T {
   return loadFile(LOCAL_STATE_FILENAMES[key], fallback);
+}
+
+function loadEnvironmentSettings(): EnvironmentSettings {
+  return normalizeEnvironmentSettings(loadLocalState<EnvironmentSettings>("environment", {}));
+}
+
+function getResolvedEnvironment(): NodeJS.ProcessEnv {
+  return resolveEnvironmentWithSettings(process.env, loadEnvironmentSettings());
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -936,6 +950,23 @@ function registerIpcHandlers() {
     openSettingsWindow();
   });
 
+  ipcMain.handle("environment:choose-file", async () => {
+    const targetWindow = settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : mainWindow;
+    const result = await dialog.showOpenDialog(targetWindow ?? undefined, {
+      properties: ["openFile"],
+      filters: [
+        { name: "Environment Files", extensions: ["env", "local", "development", "production", "test"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    return result.filePaths[0];
+  });
+
   ipcMain.handle("stories:save", async (_event, data: unknown) => {
     saveStories(data);
   });
@@ -945,12 +976,18 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("environment:get-presence", async (_event, names: string[]) => {
+    const resolvedEnv = getResolvedEnvironment();
     return Object.fromEntries(
-      names.map((name) => [name, process.env[name] !== undefined]),
+      names.map((name) => [name, resolvedEnv[name] !== undefined]),
     );
   });
 
   ipcMain.handle("local-state:save", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown) => {
+    if (key === "environment") {
+      saveLocalState(key, normalizeEnvironmentSettings(data as EnvironmentSettings));
+      return;
+    }
+
     saveLocalState(key, data);
   });
 
@@ -1380,7 +1417,7 @@ function registerIpcHandlers() {
   }
 
   ipcMain.handle("run-story", async (_event, storyJson: string, keepSession?: boolean) => {
-    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson));
+    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson), getResolvedEnvironment());
     const runId = ++currentRunId;
     return runStoryOnWebview(story, keepSession ?? false, runId);
   });
@@ -1394,7 +1431,7 @@ function registerIpcHandlers() {
   let repeatCancelled = false;
 
   ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number, keepSession?: boolean) => {
-    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson));
+    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson), getResolvedEnvironment());
     repeatCancelled = false;
 
     const iterations: Array<{ storyId: string; status: "passed" | "failed"; stepResults: StepResult[] }> = [];

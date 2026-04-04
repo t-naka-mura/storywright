@@ -1,15 +1,17 @@
 import { useState } from "react";
 import type { Step } from "../types";
 import { ACTION_OPTIONS } from "../types";
+import { extractEnvironmentVariableNames } from "../lib/environmentRequirements";
 
 interface StepEditorProps {
   step: Step;
   onSave: (step: Step) => void;
   onCancel: () => void;
   onDelete: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function StepEditor({ step, onSave, onCancel, onDelete }: StepEditorProps) {
+export function StepEditor({ step, onSave, onCancel, onDelete, onOpenSettings }: StepEditorProps) {
   const [draft, setDraft] = useState<Step>({ ...step });
 
   const needsTarget = draft.action !== "navigate" && draft.action !== "screenshot";
@@ -19,6 +21,12 @@ export function StepEditor({ step, onSave, onCancel, onDelete }: StepEditorProps
     draft.action === "select" ||
     draft.action === "assert" ||
     draft.action === "wait";
+  const referencedVariables = Array.from(
+    new Set([
+      ...extractEnvironmentVariableNames(draft.target),
+      ...extractEnvironmentVariableNames(draft.value),
+    ]),
+  );
 
   return (
     <div className="step-editor">
@@ -82,6 +90,19 @@ export function StepEditor({ step, onSave, onCancel, onDelete }: StepEditorProps
             />
             機密値（パスワード等）
           </label>
+        </div>
+      )}
+
+      {referencedVariables.length > 0 && (
+        <div className="step-editor-env-hint" role="note">
+          <div className="step-editor-env-hint-text">
+            Uses {referencedVariables.map((name) => `ENV.${name}`).join(", ")}
+          </div>
+          {onOpenSettings && (
+            <button className="step-editor-env-link" type="button" onClick={onOpenSettings}>
+              Settings を開く
+            </button>
+          )}
         </div>
       )}
 

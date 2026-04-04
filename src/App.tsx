@@ -5,7 +5,7 @@ import { DetailPanel } from "./components/DetailPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
-import type { Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
+import type { EnvironmentSettings, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import {
   collectEnvironmentRequirements,
   getMissingEnvironmentRequirementsForStory,
@@ -35,6 +35,8 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory } = useUrlHistory();
   const [error, setError] = useState<AppErrorState | null>(null);
+  const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({});
+  const [environmentSettingsError, setEnvironmentSettingsError] = useState<string | null>(null);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
@@ -53,6 +55,8 @@ function App() {
     async function load() {
       const savedStories = await window.storywright.loadStories();
       setStories(normalizeStoriesData(savedStories));
+      const savedEnvironmentSettings = await window.storywright.loadLocalState("environment") as EnvironmentSettings | null;
+      setEnvironmentSettings(savedEnvironmentSettings ?? {});
       setDataLoaded(true);
     }
     load();
@@ -84,11 +88,13 @@ function App() {
         Object.entries(presence).map(([name, isAvailable]) => [name, isAvailable ? "present" : undefined]),
       ) as Record<string, string | undefined>;
 
+      setEnvironmentSettingsError(null);
       setEnvironmentRequirements(collectEnvironmentRequirements(stories, envMap));
     }
 
     loadEnvironmentPresence().catch(() => {
       if (!cancelled) {
+        setEnvironmentSettingsError("選択された .env ファイルを読み込めませんでした。パスを確認してください。");
         setEnvironmentRequirements(draftRequirements);
       }
     });
@@ -96,7 +102,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stories]);
+  }, [stories, environmentSettings.envFilePath]);
 
   const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
   const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;
@@ -109,13 +115,40 @@ function App() {
     window.storywright.openSettingsWindow().catch(() => {});
   }, []);
 
-  const ensureEnvironmentRequirementsAvailable = useCallback((story: Story) => {
-    const envMap = Object.fromEntries(
-      environmentRequirements.map((requirement) => [
-        requirement.name,
-        requirement.status === "available" ? "present" : undefined,
-      ]),
-    ) as Record<string, string | undefined>;
+  const handleSaveEnvironmentSettings = useCallback(async (nextSettings: EnvironmentSettings) => {
+    await window.storywright.saveLocalState("environment", nextSettings);
+    setEnvironmentSettings(nextSettings);
+  }, []);
+
+  const handleChooseEnvironmentFile = useCallback(async () => {
+    return window.storywright.chooseEnvironmentFile();
+  }, []);
+
+  const ensureEnvironmentRequirementsAvailable = useCallback(async (story: Story) => {
+    const storyRequirements = collectEnvironmentRequirements({ [story.id]: story }, {});
+
+    if (storyRequirements.length === 0) {
+      return true;
+    }
+
+    let envMap: Record<string, string | undefined>;
+    try {
+      const presence = await window.storywright.getEnvironmentVariablePresence(
+        storyRequirements.map((requirement) => requirement.name),
+      );
+      envMap = Object.fromEntries(
+        Object.entries(presence).map(([name, isAvailable]) => [name, isAvailable ? "present" : undefined]),
+      ) as Record<string, string | undefined>;
+    } catch (err) {
+      setError({
+        title: "環境設定を読み込めませんでした",
+        message: String(err),
+        primaryActionLabel: "Settings を開く",
+        onPrimaryAction: handleOpenSettingsWindow,
+      });
+      return false;
+    }
+
     const missingRequirements = getMissingEnvironmentRequirementsForStory(story, envMap);
 
     if (missingRequirements.length === 0) {
@@ -130,10 +163,10 @@ function App() {
       onPrimaryAction: handleOpenSettingsWindow,
     });
     return false;
-  }, [environmentRequirements, handleOpenSettingsWindow]);
+  }, [handleOpenSettingsWindow]);
 
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
-    if (!ensureEnvironmentRequirementsAvailable(story)) {
+    if (!(await ensureEnvironmentRequirementsAvailable(story))) {
       return;
     }
 
@@ -190,7 +223,7 @@ function App() {
   }, [baseUrl, addUrlToHistory, ensureEnvironmentRequirementsAvailable]);
 
   const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number, keepSession: boolean) => {
-    if (!ensureEnvironmentRequirementsAvailable(story)) {
+    if (!(await ensureEnvironmentRequirementsAvailable(story))) {
       return;
     }
 
@@ -359,7 +392,13 @@ function App() {
   if (isSettingsWindow) {
     return (
       <div className="settings-window-layout">
-        <SettingsPanel requirements={environmentRequirements} />
+        <SettingsPanel
+          requirements={environmentRequirements}
+          environmentSettings={environmentSettings}
+          environmentSettingsError={environmentSettingsError}
+          onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
+          onChooseEnvironmentFile={handleChooseEnvironmentFile}
+        />
       </div>
     );
   }
@@ -407,6 +446,7 @@ function App() {
             onSelectStory={setSelectedStoryId}
             onDeselectStory={handleDeselectStory}
             onDeleteStory={handleDeleteStory}
+            onOpenSettings={handleOpenSettingsWindow}
           />
         </>
       </div>

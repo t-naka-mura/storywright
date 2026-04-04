@@ -3,6 +3,31 @@
 - 日付: 2026-04-04
 - ステータス: 提案
 
+## 実装進捗サマリ（2026-04-04 時点）
+
+### 実装済み
+
+- `ENV.*` requirement を集約する pure helper
+- `available` / `missing` 判定
+- app menu から開く独立 `Settings` window
+- Environment Variables セクションの一覧表示
+- 左 navigation を含む settings window の基本レイアウト
+- 実行前ダイアログから `Settings` を開く導線
+- Step / Base URL 編集中に `Settings` を開く導線
+- `.env` ファイルパスを保存する最小 UI
+
+### まだ未実装
+
+- local secret store の編集 UI
+- 実行前チェック結果を Settings と同期して強調表示する UI
+- 複数カテゴリを持つ本格的な settings IA
+- `.env` の妥当性検証や読み込み状態の詳細表示
+
+### 現在地
+
+ADR-018 の Phase 1 は最小成立している。
+加えて `.env` パス指定の最小 UI まで入ったが、現状はまだ diagnostics 中心であり、settings platform としては初期段階である。
+
 ## Context (背景)
 
 ADR-016 により、Story の step では `{{ENV.NAME}}` 記法を使って実行時に環境変数を解決できるようにした。
@@ -92,12 +117,22 @@ Settings surface に次を表示する。
 - どの Story で使われているか
 - 「この設定は export されない local information である」ことの説明
 
+実装状況:
+
+- すべて実装済み
+
 ### Phase 2 以降の拡張候補
 
 - `.env` ファイルの指定
 - local secret store に保存された値の編集
 - 実行前の設定検証導線
 - URL 履歴や preview 設定など、他の local app settings の集約
+
+実装状況:
+
+- 実行前の設定検証導線は一部実装済み
+- `.env` ファイル指定は最小形のみ実装済み
+- その他は未着手
 
 ## UI 方針
 

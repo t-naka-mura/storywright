@@ -113,6 +113,15 @@ interface Step {
 - [ADR-017](adr/ADR-017-portable-story-storage-and-import-export.md) — Portable Story Storage と Import/Export 境界
 - [ADR-018](adr/ADR-018-settings-surface-for-environment-requirements.md) — Environment Requirements を表示する Settings surface
 
+### 実装メモ（2026-04-04）
+
+- ADR-016 Phase 1 は概ね実装済み
+- ADR-016 Phase 2 は単一 `.env` ファイル指定まで着手済み
+- ADR-018 Phase 1 は最小成立済み
+- Settings には `.env` パス指定の最小 UI が入っている
+- 未着手の中心は複数 `.env` 対応と settings の入力 UX 拡張
+- 詳細な実装済み / 未実装の境界は ADR-016, ADR-018 本文内の「実装進捗サマリ」を参照
+
 ### ADR（アーカイブ）
 
 `docs/ai/adr/archive/` に移動済み。`git log` で過去の設計判断を参照可能。

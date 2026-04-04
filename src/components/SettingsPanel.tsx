@@ -1,11 +1,28 @@
+import { useEffect, useState } from "react";
+import type { EnvironmentSettings } from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
 interface SettingsPanelProps {
   requirements: EnvironmentRequirement[];
+  environmentSettings: EnvironmentSettings;
+  environmentSettingsError: string | null;
+  onSaveEnvironmentSettings: (settings: EnvironmentSettings) => Promise<void>;
+  onChooseEnvironmentFile: () => Promise<string | null>;
 }
 
-export function SettingsPanel({ requirements }: SettingsPanelProps) {
+export function SettingsPanel({
+  requirements,
+  environmentSettings,
+  environmentSettingsError,
+  onSaveEnvironmentSettings,
+  onChooseEnvironmentFile,
+}: SettingsPanelProps) {
   const missingCount = requirements.filter((requirement) => requirement.status === "missing").length;
+  const [envFilePathDraft, setEnvFilePathDraft] = useState(environmentSettings.envFilePath ?? "");
+
+  useEffect(() => {
+    setEnvFilePathDraft(environmentSettings.envFilePath ?? "");
+  }, [environmentSettings.envFilePath]);
 
   return (
     <section className="settings-panel" aria-label="Settings">
@@ -40,6 +57,60 @@ export function SettingsPanel({ requirements }: SettingsPanelProps) {
                   <span className={`settings-summary-badge ${missingCount > 0 ? "settings-summary-badge-warning" : "settings-summary-badge-ok"}`}>
                     {missingCount > 0 ? `${missingCount} missing` : "All available"}
                   </span>
+                </div>
+              )}
+            </div>
+
+            <div className="settings-section settings-section-compact">
+              <div className="settings-section-header">
+                <h3 className="settings-subsection-title">Environment Source</h3>
+                <p className="settings-section-description">
+                  `.env` ファイルを指定すると、同名の値は `process.env` より優先して解決されます。
+                </p>
+              </div>
+              <div className="settings-source-row">
+                <input
+                  className="settings-source-input"
+                  value={envFilePathDraft}
+                  onChange={(event) => setEnvFilePathDraft(event.target.value)}
+                  placeholder="/path/to/.env"
+                />
+                <button className="btn" type="button" onClick={async () => {
+                  const selected = await onChooseEnvironmentFile();
+                  if (!selected) return;
+                  setEnvFilePathDraft(selected);
+                  await onSaveEnvironmentSettings({ envFilePath: selected });
+                }}>
+                  Browse
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => onSaveEnvironmentSettings({ envFilePath: envFilePathDraft || undefined })}
+                >
+                  Save
+                </button>
+              </div>
+              <div className="settings-source-meta-row">
+                <span className="settings-source-meta">
+                  {environmentSettings.envFilePath ? `Using ${environmentSettings.envFilePath}` : "Using process.env only"}
+                </span>
+                {environmentSettings.envFilePath && (
+                  <button
+                    className="settings-text-button"
+                    type="button"
+                    onClick={() => {
+                      setEnvFilePathDraft("");
+                      void onSaveEnvironmentSettings({});
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {environmentSettingsError && (
+                <div className="settings-inline-error" role="alert">
+                  {environmentSettingsError}
                 </div>
               )}
             </div>

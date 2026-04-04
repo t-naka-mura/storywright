@@ -9,9 +9,11 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("environment:get-presence", names),
   openSettingsWindow: () =>
     ipcRenderer.invoke("app:open-settings"),
-  saveLocalState: (key: "urlHistory", data: unknown) =>
+  chooseEnvironmentFile: () =>
+    ipcRenderer.invoke("environment:choose-file"),
+  saveLocalState: (key: "urlHistory" | "environment", data: unknown) =>
     ipcRenderer.invoke("local-state:save", key, data),
-  loadLocalState: (key: "urlHistory") =>
+  loadLocalState: (key: "urlHistory" | "environment") =>
     ipcRenderer.invoke("local-state:load", key),
   runStory: (storyJson: string, keepSession?: boolean) =>
     ipcRenderer.invoke("run-story", storyJson, keepSession),

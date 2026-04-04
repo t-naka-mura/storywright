@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import type { Story, Step, StoryResult, RepeatResult } from "../types";
 import { StepEditor } from "./StepEditor";
 import { createStep, getStoryCreatedAt } from "../lib/storyDocument";
+import { extractEnvironmentVariableNames } from "../lib/environmentRequirements";
 
 interface DetailPanelProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ interface DetailPanelProps {
   onSelectStory?: (storyId: string) => void;
   onDeselectStory?: () => void;
   onDeleteStory?: (storyId: string) => void;
+  onOpenSettings?: () => void;
 }
 
 function createEmptyStep(order: number): Step {
@@ -47,6 +49,7 @@ export function DetailPanel({
   onSelectStory,
   onDeselectStory,
   onDeleteStory,
+  onOpenSettings,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -56,6 +59,7 @@ export function DetailPanel({
   const [repeatCount, setRepeatCount] = useState(1);
   const [keepSession, setKeepSession] = useState(false);
   const dragCounter = useRef(0);
+  const baseUrlEnvironmentVariables = story ? extractEnvironmentVariableNames(story.baseUrl ?? "") : [];
 
   const handleAddStep = () => {
     if (!story) return;
@@ -198,6 +202,16 @@ export function DetailPanel({
                 }
                 placeholder="https://..."
               />
+              {baseUrlEnvironmentVariables.length > 0 && (
+                <div className="panel-inline-hint" role="note">
+                  <span>Uses {baseUrlEnvironmentVariables.map((name) => `ENV.${name}`).join(", ")}</span>
+                  {onOpenSettings && (
+                    <button className="panel-inline-hint-link" type="button" onClick={onOpenSettings}>
+                      Settings を開く
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <ol className="step-list">
               {story.steps.map((step, index) => {
@@ -222,6 +236,7 @@ export function DetailPanel({
                         onSave={(s) => handleUpdateStep(index, s)}
                         onCancel={() => setEditingIndex(null)}
                         onDelete={() => handleDeleteStep(index)}
+                        onOpenSettings={onOpenSettings}
                       />
                     ) : (
                       <div

@@ -45,6 +45,7 @@ describe("PreviewPanel", () => {
       loadStories: vi.fn(async () => null),
       getEnvironmentVariablePresence: vi.fn(async () => ({})),
       openSettingsWindow: vi.fn(async () => {}),
+      chooseEnvironmentFile: vi.fn(async () => null),
       saveLocalState: vi.fn(async () => {}),
       loadLocalState: vi.fn(async () => null),
       runStory: vi.fn(async () => createStoryResult()),

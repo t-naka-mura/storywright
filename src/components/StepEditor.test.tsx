@@ -129,4 +129,35 @@ describe("StepEditor sensitive トグル", () => {
       expect.objectContaining({ sensitive: undefined }),
     );
   });
+
+  it("ENV 参照があると Settings 導線を表示する", () => {
+    render(
+      <StepEditor
+        step={createStep({ target: "#input", value: "{{ENV.USERNAME}}" })}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Uses ENV.USERNAME")).toBeInTheDocument();
+    expect(screen.getByText("Settings を開く")).toBeInTheDocument();
+  });
+
+  it("Settings 導線を押すとコールバックを呼ぶ", () => {
+    const onOpenSettings = vi.fn();
+    render(
+      <StepEditor
+        step={createStep({ target: "#input", value: "{{ENV.USERNAME}}" })}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Settings を開く"));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+  });
 });

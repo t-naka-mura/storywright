@@ -88,4 +88,6 @@ contextBridge.exposeInMainWorld("storywright", {
   testGetPreviewBounds: () => ipcRenderer.invoke("test:get-preview-bounds"),
   testOpenSettings: () => ipcRenderer.invoke("test:open-settings"),
   testEvaluatePreview: (script: string) => ipcRenderer.invoke("test:evaluate-preview", script),
+  testExportToFile: (data: unknown, filePath: string) => ipcRenderer.invoke("test:export-to-file", data, filePath),
+  testImportFromFile: (filePath: string) => ipcRenderer.invoke("test:import-from-file", filePath),
 });

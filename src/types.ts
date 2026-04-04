@@ -167,6 +167,8 @@ export interface StorywrightAPI {
   testGetPreviewBounds?: () => Promise<PreviewBounds>;
   testOpenSettings?: () => Promise<void>;
   testEvaluatePreview?: (script: string) => Promise<unknown>;
+  testExportToFile?: (data: unknown, filePath: string) => Promise<string>;
+  testImportFromFile?: (filePath: string) => Promise<unknown>;
 }
 
 declare global {

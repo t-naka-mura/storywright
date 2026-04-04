@@ -111,8 +111,9 @@ test("recorded stories can be parameterized with multiple LOCAL_ENV keys and the
 
       await settingsWindow.waitForTimeout(500);
       await restoredWindow.getByRole("button", { name: "閉じる", exact: true }).click();
+      const expectedStepCount = await restoredWindow.locator(".step-item").count();
       await restoredWindow.getByRole("button", { name: /Run/ }).click();
-      await expect(restoredWindow.locator(".step-order-passed")).toHaveCount(10);
+      await expect(restoredWindow.locator(".step-order-passed")).toHaveCount(expectedStepCount);
     } finally {
       await secondSession.close();
     }

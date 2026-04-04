@@ -259,6 +259,18 @@ export async function persistStories(page: Page, stories: PersistedStory[]) {
   }, stories);
 }
 
+export async function testExportToFile(page: Page, data: unknown, filePath: string): Promise<string> {
+  return page.evaluate(async ({ d, p }) => {
+    return window.storywright.testExportToFile?.(d, p) ?? '';
+  }, { d: data, p: filePath });
+}
+
+export async function testImportFromFile(page: Page, filePath: string): Promise<unknown> {
+  return page.evaluate(async (p) => {
+    return window.storywright.testImportFromFile?.(p) ?? null;
+  }, filePath);
+}
+
 export async function waitForRecordedStepCount(page: Page, count: number) {
   await expect.poll(async () => {
     const text = await page.locator(".preview-recording-badge").textContent();

@@ -1245,6 +1245,14 @@ function registerIpcHandlers() {
       await waitForWebContentsReady(wc);
       return wc.executeJavaScript(script);
     });
+    ipcMain.handle("test:export-to-file", async (_event, data: unknown, filePath: string) => {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+      return filePath;
+    });
+    ipcMain.handle("test:import-from-file", async (_event, filePath: string) => {
+      const content = fs.readFileSync(filePath, "utf-8");
+      return JSON.parse(content);
+    });
   }
 
   ipcMain.handle("start-recording", async () => {

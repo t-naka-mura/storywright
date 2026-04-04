@@ -1,6 +1,6 @@
 import type { Story } from "../types";
 
-const ENV_PLACEHOLDER_RE = /\{\{ENV\.([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const ENV_PLACEHOLDER_RE = /\{\{LOCAL_ENV\.([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 
 export type EnvironmentRequirementStatus = "available" | "missing";
 
@@ -82,7 +82,7 @@ export function collectEnvironmentRequirements(
   return [...requirements.entries()]
     .map(([name, requirement]) => ({
       name,
-      displayName: `ENV.${name}`,
+      displayName: `LOCAL_ENV.${name}`,
       status: (env[name] === undefined ? "missing" : "available") as EnvironmentRequirementStatus,
       occurrenceCount: requirement.occurrenceCount,
       stories: [...requirement.stories.values()].sort((left, right) =>

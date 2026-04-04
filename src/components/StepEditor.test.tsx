@@ -133,7 +133,7 @@ describe("StepEditor sensitive トグル", () => {
   it("ENV 参照があると Settings 導線を表示する", () => {
     render(
       <StepEditor
-        step={createStep({ target: "#input", value: "{{ENV.USERNAME}}" })}
+        step={createStep({ target: "#input", value: "{{LOCAL_ENV.USERNAME}}" })}
         onSave={vi.fn()}
         onCancel={vi.fn()}
         onDelete={vi.fn()}
@@ -141,7 +141,7 @@ describe("StepEditor sensitive トグル", () => {
       />,
     );
 
-    expect(screen.getByText("Uses ENV.USERNAME")).toBeInTheDocument();
+    expect(screen.getByText("Uses LOCAL_ENV.USERNAME")).toBeInTheDocument();
     expect(screen.getByText("Settings を開く")).toBeInTheDocument();
   });
 
@@ -149,7 +149,7 @@ describe("StepEditor sensitive トグル", () => {
     const onOpenSettings = vi.fn();
     render(
       <StepEditor
-        step={createStep({ target: "#input", value: "{{ENV.USERNAME}}" })}
+        step={createStep({ target: "#input", value: "{{LOCAL_ENV.USERNAME}}" })}
         onSave={vi.fn()}
         onCancel={vi.fn()}
         onDelete={vi.fn()}
@@ -164,7 +164,7 @@ describe("StepEditor sensitive トグル", () => {
   it("ENV 参照の type step では sensitive 提案を表示する", () => {
     render(
       <StepEditor
-        step={createStep({ action: "type", value: "{{ENV.PASSWORD}}", sensitive: false })}
+        step={createStep({ action: "type", value: "{{LOCAL_ENV.PASSWORD}}", sensitive: false })}
         onSave={vi.fn()}
         onCancel={vi.fn()}
         onDelete={vi.fn()}
@@ -178,7 +178,7 @@ describe("StepEditor sensitive トグル", () => {
     const onSave = vi.fn();
     render(
       <StepEditor
-        step={createStep({ action: "type", value: "{{ENV.PASSWORD}}", sensitive: false })}
+        step={createStep({ action: "type", value: "{{LOCAL_ENV.PASSWORD}}", sensitive: false })}
         onSave={onSave}
         onCancel={vi.fn()}
         onDelete={vi.fn()}

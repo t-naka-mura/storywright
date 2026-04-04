@@ -75,17 +75,17 @@ describe("storyDocument", () => {
     expect(doc.stories.storyA.steps[0].value).toBe("");
   });
 
-  it("ENV placeholder の sensitive value は export で保持する", () => {
+  it("LOCAL_ENV placeholder の sensitive value は export で保持する", () => {
     const doc = createExportStoryDocument({
       storyA: {
         id: "storyA",
         title: "Story A",
         metadata: createStoryMetadata(1),
-        steps: [createStep({ order: 1, action: "type", target: "#password", value: "{{ENV.PASSWORD}}", sensitive: true })],
+        steps: [createStep({ order: 1, action: "type", target: "#password", value: "{{LOCAL_ENV.PASSWORD}}", sensitive: true })],
       },
     });
 
-    expect(doc.stories.storyA.steps[0].value).toBe("{{ENV.PASSWORD}}");
+    expect(doc.stories.storyA.steps[0].value).toBe("{{LOCAL_ENV.PASSWORD}}");
   });
 
   it("import 時に story id 衝突は imported copy として追加する", () => {

@@ -9,12 +9,14 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("stories:export", data, suggestedFileName),
   importStoriesFromFile: () =>
     ipcRenderer.invoke("stories:import"),
-  getEnvironmentVariablePresence: (names: string[]) =>
-    ipcRenderer.invoke("environment:get-presence", names),
+  getEnvironmentVariablePresence: (names: string[], url?: string) =>
+    ipcRenderer.invoke("environment:get-presence", names, url),
   getEnvironmentSourceStatus: () =>
     ipcRenderer.invoke("environment:get-source-status"),
   openSettingsWindow: () =>
     ipcRenderer.invoke("app:open-settings"),
+  closeCurrentWindow: () =>
+    ipcRenderer.invoke("app:close-current-window"),
   importEnvironmentFile: () =>
     ipcRenderer.invoke("environment:import-file"),
   saveLocalState: (key: "urlHistory" | "environment", data: unknown) =>

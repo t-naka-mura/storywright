@@ -37,6 +37,7 @@ export interface EnvironmentDomainValue {
 export interface EnvironmentDomain {
   id: string;
   name: string;
+  matchHost: string;
   values: EnvironmentDomainValue[];
 }
 
@@ -135,9 +136,10 @@ export interface StorywrightAPI {
   importStoriesFromFile: () => Promise<unknown | null>;
   saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
-  getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
+  getEnvironmentVariablePresence: (names: string[], url?: string) => Promise<EnvironmentPresenceMap>;
   getEnvironmentSourceStatus: () => Promise<EnvironmentSourceStatus>;
   openSettingsWindow: () => Promise<void>;
+  closeCurrentWindow: () => Promise<void>;
   importEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;

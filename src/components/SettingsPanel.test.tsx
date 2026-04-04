@@ -10,11 +10,13 @@ function createEnvironmentSettings(): EnvironmentSettings {
       {
         id: "jp",
         name: "Japan",
+        matchHost: "example.jp",
         values: [{ key: "TOKEN", value: "jp-token" }],
       },
       {
         id: "us",
         name: "US",
+        matchHost: "example.com",
         values: [{ key: "TOKEN", value: "us-token" }],
       },
     ],
@@ -33,7 +35,7 @@ function renderSettingsPanel(initialSettings: EnvironmentSettings = createEnviro
         requirements={[
           {
             name: "TOKEN",
-            displayName: "ENV.TOKEN",
+            displayName: "LOCAL_ENV.TOKEN",
             status: "available",
             occurrenceCount: 1,
             stories: [{ storyId: "story-1", storyTitle: "Login" }],
@@ -41,7 +43,6 @@ function renderSettingsPanel(initialSettings: EnvironmentSettings = createEnviro
         ]}
         environmentSettings={settings}
         environmentSettingsError={null}
-        environmentSourceStatus={{ mode: "domain-values", loadedVariableCount: 2, inlineValueCount: 1 }}
         onSaveEnvironmentSettings={async (nextSettings) => {
           setSettings(nextSettings);
         }}
@@ -57,15 +58,20 @@ function renderSettingsPanel(initialSettings: EnvironmentSettings = createEnviro
 }
 
 describe("SettingsPanel", () => {
-  it("line item editor で key/value を保存できる", async () => {
+  it("サイドバーの件数は保存済み value 数を表示する", () => {
+    renderSettingsPanel();
+
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("line item editor で key/value を自動保存できる", async () => {
     renderSettingsPanel();
 
     fireEvent.change(screen.getByLabelText("Environment key 1"), { target: { value: "API_KEY" } });
     fireEvent.change(screen.getByLabelText("Environment value 1"), { target: { value: "secret-value" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
-      expect(screen.getByText("1 values saved")).toBeInTheDocument();
+      expect(screen.getByDisplayValue("secret-value")).toBeInTheDocument();
     });
 
     expect(screen.getByDisplayValue("API_KEY")).toBeInTheDocument();
@@ -75,38 +81,75 @@ describe("SettingsPanel", () => {
   it("duplicate key がある間は保存できず警告を表示する", () => {
     renderSettingsPanel();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add environment value" }));
     fireEvent.change(screen.getByLabelText("Environment key 1"), { target: { value: "TOKEN" } });
     fireEvent.change(screen.getByLabelText("Environment key 2"), { target: { value: "TOKEN" } });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Duplicate keys: TOKEN");
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 
-  it("未保存変更を表示し、保存後に消える", async () => {
+  it("値変更は自動保存される", async () => {
     renderSettingsPanel();
-
-    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Environment value 1"), { target: { value: "next-token" } });
 
-    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
     await waitFor(() => {
-      expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+      expect(screen.getByDisplayValue("next-token")).toBeInTheDocument();
     });
   });
 
-  it("value 検索で対象行だけを表示する", () => {
+  it("environment tab を切り替えて close button で削除できる", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderSettingsPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "US" }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("us-token")).toBeInTheDocument();
+    });
+
+    expect(screen.getByDisplayValue("us-token")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete LOCAL_ENV US" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("tab", { name: "US" })).not.toBeInTheDocument();
+    });
+
+    expect(confirmSpy).toHaveBeenCalledWith('Delete LOCAL_ENV "US"?');
+  });
+
+  it("environment を追加すると新しい tab が選択される", async () => {
+    renderSettingsPanel();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add LOCAL_ENV" }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("LOCAL_ENV")).toBeInTheDocument();
+    });
+  });
+
+  it("tab は 10 件で追加ボタンを表示しない", () => {
+    renderSettingsPanel({
+      domains: Array.from({ length: 10 }, (_, index) => ({
+        id: `env-${index + 1}`,
+        name: `LOCAL_ENV_${index + 1}`,
+        matchHost: `example${index + 1}.com`,
+        values: [],
+      })),
+      activeDomainId: "env-1",
+    });
+
+    expect(screen.queryByRole("button", { name: "Add LOCAL_ENV" })).not.toBeInTheDocument();
+  });
+
+  it("value row を close button で削除できる", async () => {
     renderSettingsPanel({
       domains: [
         {
           id: "jp",
           name: "Japan",
+          matchHost: "example.jp",
           values: [
             { key: "TOKEN", value: "jp-token" },
             { key: "BASE_URL", value: "https://example.com" },
@@ -116,48 +159,10 @@ describe("SettingsPanel", () => {
       activeDomainId: "jp",
     });
 
-    fireEvent.change(screen.getByLabelText("Search environment values"), { target: { value: "base" } });
-
-    expect(screen.getByDisplayValue("BASE_URL")).toBeInTheDocument();
-    expect(screen.queryByDisplayValue("TOKEN")).not.toBeInTheDocument();
-  });
-
-  it("requirement 検索で一致しない場合は空状態を表示する", () => {
-    renderSettingsPanel();
-
-    fireEvent.change(screen.getByLabelText("Search environment requirements"), { target: { value: "checkout" } });
-
-    expect(screen.getByText("No matching requirements.")).toBeInTheDocument();
-  });
-
-  it("domain tab を切り替えて current domain を削除できる", async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    renderSettingsPanel();
-
-    fireEvent.click(screen.getByRole("tab", { name: "US" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove environment value 2" }));
 
     await waitFor(() => {
-      expect(screen.getByText("Editing US")).toBeInTheDocument();
-    });
-
-    expect(screen.getByDisplayValue("us-token")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete current domain" }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole("tab", { name: "US" })).not.toBeInTheDocument();
-    });
-
-    expect(confirmSpy).toHaveBeenCalledWith('Delete domain "US"?');
-  });
-
-  it("domain を追加すると新しい tab が選択される", async () => {
-    renderSettingsPanel();
-
-    fireEvent.click(screen.getByRole("button", { name: "+ Add domain" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("Editing Domain 3")).toBeInTheDocument();
+      expect(screen.queryByDisplayValue("BASE_URL")).not.toBeInTheDocument();
     });
   });
 });

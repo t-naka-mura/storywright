@@ -5,7 +5,7 @@ import { DetailPanel } from "./components/DetailPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
-import type { EnvironmentSettings, EnvironmentSourceStatus, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
+import type { EnvironmentSettings, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import {
   collectEnvironmentRequirements,
   createEnvironmentSetupGuide,
@@ -71,7 +71,6 @@ function App() {
   const [error, setError] = useState<AppErrorState | null>(null);
   const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({});
   const [environmentSettingsError, setEnvironmentSettingsError] = useState<string | null>(null);
-  const [environmentSourceStatus, setEnvironmentSourceStatus] = useState<EnvironmentSourceStatus | null>(null);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
   const [repeatResult, setRepeatResult] = useState<RepeatResult | null>(null);
   const unsubRepeatRef = useRef<(() => void) | null>(null);
@@ -111,11 +110,9 @@ function App() {
       try {
         const status = await window.storywright.getEnvironmentSourceStatus();
         if (cancelled) return;
-        setEnvironmentSourceStatus(status);
         setEnvironmentSettingsError(status.error ?? null);
       } catch (err) {
         if (cancelled) return;
-        setEnvironmentSourceStatus(null);
         setEnvironmentSettingsError(String(err));
       }
     }
@@ -270,7 +267,7 @@ function App() {
     return window.storywright.importEnvironmentFile();
   }, []);
 
-  const ensureEnvironmentRequirementsAvailable = useCallback(async (story: Story) => {
+  const ensureEnvironmentRequirementsAvailable = useCallback(async (story: Story, url: string) => {
     const storyRequirements = collectEnvironmentRequirements({ [story.id]: story }, {});
 
     if (storyRequirements.length === 0) {
@@ -281,14 +278,16 @@ function App() {
     try {
       const presence = await window.storywright.getEnvironmentVariablePresence(
         storyRequirements.map((requirement) => requirement.name),
+        url,
       );
       envMap = Object.fromEntries(
         Object.entries(presence).map(([name, isAvailable]) => [name, isAvailable ? "present" : undefined]),
       ) as Record<string, string | undefined>;
     } catch (err) {
+      const message = String(err);
       setError({
-        title: "環境設定を読み込めませんでした",
-        message: String(err),
+        title: message.includes("match hostname") ? "一致する環境設定がありません" : "環境設定を読み込めませんでした",
+        message,
         primaryActionLabel: "Settings を開く",
         onPrimaryAction: handleOpenSettingsWindow,
       });
@@ -312,13 +311,13 @@ function App() {
   }, [handleOpenSettingsWindow]);
 
   const handleRunStory = useCallback(async (story: Story, keepSession: boolean) => {
-    if (!(await ensureEnvironmentRequirementsAvailable(story))) {
+    const effectiveBaseUrl = story.baseUrl || baseUrl;
+    if (!(await ensureEnvironmentRequirementsAvailable(story, effectiveBaseUrl))) {
       return;
     }
 
     runCancelledRef.current = false;
     setIsRunning(true);
-    const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setResults((prev) => {
       const next = { ...prev };
@@ -369,12 +368,12 @@ function App() {
   }, [baseUrl, addUrlToHistory, ensureEnvironmentRequirementsAvailable]);
 
   const handleRunStoryRepeat = useCallback(async (story: Story, repeatCount: number, keepSession: boolean) => {
-    if (!(await ensureEnvironmentRequirementsAvailable(story))) {
+    const effectiveBaseUrl = story.baseUrl || baseUrl;
+    if (!(await ensureEnvironmentRequirementsAvailable(story, effectiveBaseUrl))) {
       return;
     }
 
     setIsRunning(true);
-    const effectiveBaseUrl = story.baseUrl || baseUrl;
     addUrlToHistory(effectiveBaseUrl);
     setRepeatProgress({ current: 0, total: repeatCount });
     setRepeatResult(null);
@@ -538,14 +537,15 @@ function App() {
   if (isSettingsWindow) {
     return (
       <div className="settings-window-layout">
-        <SettingsPanel
-          requirements={environmentRequirements}
-          environmentSettings={environmentSettings}
-          environmentSettingsError={environmentSettingsError}
-          environmentSourceStatus={environmentSourceStatus}
-          onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
-          onImportEnvironmentFile={handleImportEnvironmentFile}
-        />
+        <div className="settings-window-body">
+          <SettingsPanel
+            requirements={environmentRequirements}
+            environmentSettings={environmentSettings}
+            environmentSettingsError={environmentSettingsError}
+            onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
+            onImportEnvironmentFile={handleImportEnvironmentFile}
+          />
+        </div>
       </div>
     );
   }

@@ -113,7 +113,7 @@ export function StepEditor({ step, onSave, onCancel, onDelete, onOpenSettings }:
       {referencedVariables.length > 0 && (
         <div className="step-editor-env-hint" role="note">
           <div className="step-editor-env-hint-text">
-            Uses {referencedVariables.map((name) => `ENV.${name}`).join(", ")}
+            Uses {referencedVariables.map((name) => `LOCAL_ENV.${name}`).join(", ")}
           </div>
           {onOpenSettings && (
             <button className="step-editor-env-link" type="button" onClick={onOpenSettings}>

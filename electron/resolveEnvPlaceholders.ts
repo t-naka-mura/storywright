@@ -10,7 +10,7 @@ type StoryLike<TStep extends StepLike = StepLike> = {
   steps: TStep[];
 };
 
-const ENV_PLACEHOLDER_RE = /\{\{ENV\.([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
+const ENV_PLACEHOLDER_RE = /\{\{LOCAL_ENV\.([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 
 export function resolveEnvPlaceholders(text: string, env: NodeJS.ProcessEnv = process.env): string {
   return text.replace(ENV_PLACEHOLDER_RE, (_match, variableName: string) => {

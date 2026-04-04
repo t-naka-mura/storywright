@@ -206,7 +206,7 @@ export function DetailPanel({
               />
               {baseUrlEnvironmentVariables.length > 0 && (
                 <div className="panel-inline-hint" role="note">
-                  <span>Uses {baseUrlEnvironmentVariables.map((name) => `ENV.${name}`).join(", ")}</span>
+                  <span>Uses {baseUrlEnvironmentVariables.map((name) => `LOCAL_ENV.${name}`).join(", ")}</span>
                   {onOpenSettings && (
                     <button className="panel-inline-hint-link" type="button" onClick={onOpenSettings}>
                       Settings を開く

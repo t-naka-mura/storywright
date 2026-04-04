@@ -10,15 +10,15 @@ describe("ErrorDialog", () => {
         message="1 story を export しました。"
         onClose={vi.fn()}
         setupGuide={{
-          requirements: ["ENV.API_TOKEN", "ENV.PASSWORD"],
+          requirements: ["LOCAL_ENV.API_TOKEN", "LOCAL_ENV.PASSWORD"],
           footer: "Open Settings to add local values or import a .env file.",
         }}
       />,
     );
 
     expect(screen.getByLabelText("Setup guide")).toBeInTheDocument();
-    expect(screen.getByText("ENV.API_TOKEN")).toBeInTheDocument();
-    expect(screen.getByText("ENV.PASSWORD")).toBeInTheDocument();
+    expect(screen.getByText("LOCAL_ENV.API_TOKEN")).toBeInTheDocument();
+    expect(screen.getByText("LOCAL_ENV.PASSWORD")).toBeInTheDocument();
     expect(screen.getByText("Open Settings to add local values or import a .env file.")).toBeInTheDocument();
   });
 

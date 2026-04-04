@@ -1,6 +1,6 @@
-import { resolveStoryEnvironmentVariables } from "./resolveEnvPlaceholders";
+import { resolveEnvPlaceholders } from "./resolveEnvPlaceholders";
 import { prepareStoriesForPersistence, hydrateStoriesWithSecrets } from "./storySecrets";
-import { inspectEnvironmentSource, normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
+import { getMatchingEnvironmentDomain, inspectEnvironmentSource, normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
 
 const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu, dialog } = require("electron");
 const { parse: parseDotenv } = require("dotenv");
@@ -18,6 +18,7 @@ type EnvironmentSettings = {
   domains?: Array<{
     id: string;
     name: string;
+    matchHost: string;
     values: Array<{ key: string; value: string }>;
   }>;
   activeDomainId?: string;
@@ -156,8 +157,21 @@ function loadEnvironmentSettings(): EnvironmentSettings {
   return normalizeEnvironmentSettings(loadLocalState<EnvironmentSettings>("environment", {}));
 }
 
-function getResolvedEnvironment(): NodeJS.ProcessEnv {
-  return resolveEnvironmentWithSettings(process.env, loadEnvironmentSettings());
+function getResolvedEnvironment(url?: string): NodeJS.ProcessEnv {
+  return resolveEnvironmentWithSettings(process.env, loadEnvironmentSettings(), url);
+}
+
+function getResolvedEnvironmentForUrlOrThrow(url: string): NodeJS.ProcessEnv {
+  const settings = loadEnvironmentSettings();
+  const hasConfiguredDomains = (settings.domains?.length ?? 0) > 0;
+  const matchedDomain = getMatchingEnvironmentDomain(settings, url);
+
+  if (hasConfiguredDomains && !matchedDomain) {
+    const hostname = new URL(url).hostname;
+    throw new Error(`No environment settings match hostname: ${hostname}`);
+  }
+
+  return resolveEnvironmentWithSettings(process.env, settings, url);
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -201,7 +215,7 @@ function openSettingsWindow() {
     height: 760,
     minWidth: 760,
     minHeight: 560,
-    title: "Settings - Storywright",
+    title: "Settings",
     parent: mainWindow ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -250,6 +264,20 @@ function buildApplicationMenu() {
         ...(!isMac ? [settingsItem] : []),
         { type: "separator" },
         { role: "quit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "delete" },
+        { type: "separator" },
+        { role: "selectAll" },
       ],
     },
     {
@@ -963,6 +991,15 @@ function registerIpcHandlers() {
     openSettingsWindow();
   });
 
+  ipcMain.handle("app:close-current-window", async (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender);
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      return;
+    }
+
+    targetWindow.close();
+  });
+
   ipcMain.handle("environment:import-file", async () => {
     const targetWindow = settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : mainWindow;
     const result = await dialog.showOpenDialog(targetWindow ?? undefined, {
@@ -1050,8 +1087,8 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("environment:get-presence", async (_event, names: string[]) => {
-    const resolvedEnv = getResolvedEnvironment();
+  ipcMain.handle("environment:get-presence", async (_event, names: string[], url?: string) => {
+    const resolvedEnv = url ? getResolvedEnvironmentForUrlOrThrow(url) : getResolvedEnvironment();
     return Object.fromEntries(
       names.map((name) => [name, resolvedEnv[name] !== undefined]),
     );
@@ -1071,6 +1108,10 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("local-state:load", async (_event, key: keyof typeof LOCAL_STATE_FILENAMES) => {
+    if (key === "environment") {
+      return normalizeEnvironmentSettings(loadLocalState<EnvironmentSettings>(key, {}));
+    }
+
     return loadLocalState(key, null);
   });
 
@@ -1389,6 +1430,9 @@ function registerIpcHandlers() {
 
     const stepResults: StepResult[] = [];
     let storyStatus: "passed" | "failed" = "passed";
+    let currentExecutionUrl = story.baseUrl
+      ? resolveEnvPlaceholders(story.baseUrl, getResolvedEnvironmentForUrlOrThrow(story.baseUrl))
+      : (/^https?:\/\//.test(wc.getURL()) ? wc.getURL() : undefined);
 
     for (const step of story.steps) {
       if (runId !== currentRunId) {
@@ -1416,8 +1460,17 @@ function registerIpcHandlers() {
 
       const start = Date.now();
       try {
-        if (step.action === "navigate") {
-          const url = resolveUrl(step.target, story.baseUrl);
+        const resolvedStep = currentExecutionUrl
+          ? {
+              ...step,
+              target: resolveEnvPlaceholders(step.target, getResolvedEnvironmentForUrlOrThrow(currentExecutionUrl)),
+              value: resolveEnvPlaceholders(step.value, getResolvedEnvironmentForUrlOrThrow(currentExecutionUrl)),
+            }
+          : step;
+
+        if (resolvedStep.action === "navigate") {
+          const url = resolveUrl(resolvedStep.target, currentExecutionUrl ?? story.baseUrl);
+          currentExecutionUrl = url;
           // CDP で navigate + Runtime.evaluate でエンジン注入
           // executeJavaScript はページロード完了を待つため遅い。
           // Runtime.evaluate ならロード中でもスクリプトを注入できる。
@@ -1452,7 +1505,7 @@ function registerIpcHandlers() {
             returnByValue: true,
           });
           const evalResult = await wc.debugger.sendCommand("Runtime.evaluate", {
-            expression: `window.__storywrightExecuteStep(${JSON.stringify(step)})`,
+            expression: `window.__storywrightExecuteStep(${JSON.stringify(resolvedStep)})`,
             returnByValue: true,
             awaitPromise: true,
           }) as { result?: { value?: { status?: string; error?: string } }; exceptionDetails?: { text?: string } };
@@ -1463,6 +1516,7 @@ function registerIpcHandlers() {
           if (!result || result.status !== "passed") {
             throw new Error(result?.error || "Step failed");
           }
+          currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
         }
         const durationMs = Date.now() - start;
         stepResults.push({ order: step.order, status: "passed", durationMs });
@@ -1496,7 +1550,7 @@ function registerIpcHandlers() {
   }
 
   ipcMain.handle("run-story", async (_event, storyJson: string, keepSession?: boolean) => {
-    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson), getResolvedEnvironment());
+    const story: StoryInput = JSON.parse(storyJson);
     const runId = ++currentRunId;
     return runStoryOnWebview(story, keepSession ?? false, runId);
   });
@@ -1510,7 +1564,7 @@ function registerIpcHandlers() {
   let repeatCancelled = false;
 
   ipcMain.handle("run-story-repeat", async (_event, storyJson: string, repeatCount: number, keepSession?: boolean) => {
-    const story: StoryInput = resolveStoryEnvironmentVariables(JSON.parse(storyJson), getResolvedEnvironment());
+    const story: StoryInput = JSON.parse(storyJson);
     repeatCancelled = false;
 
     const iterations: Array<{ storyId: string; status: "passed" | "failed"; stepResults: StepResult[] }> = [];

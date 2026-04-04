@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getActiveEnvironmentDomain,
+  getMatchingEnvironmentDomain,
   inspectEnvironmentSource,
   normalizeEnvironmentSettings,
   resolveEnvironmentWithSettings,
@@ -10,12 +11,28 @@ describe("normalizeEnvironmentSettings", () => {
   it("domain を正規化して activeDomainId を決める", () => {
     expect(normalizeEnvironmentSettings({
       domains: [
-        { id: " jp ", name: " Japan ", values: [{ key: " TOKEN ", value: "jp-token" }] },
+        { id: " jp ", name: " Japan ", matchHost: " example.jp ", values: [{ key: " TOKEN ", value: "jp-token" }] },
       ],
       activeDomainId: "jp",
     })).toEqual({
-      domains: [{ id: "jp", name: "Japan", values: [{ key: "TOKEN", value: "jp-token" }] }],
+      domains: [{ id: "jp", name: "Japan", matchHost: "example.jp", values: [{ key: "TOKEN", value: "jp-token" }] }],
       activeDomainId: "jp",
+    });
+  });
+
+  it("旧自動ラベルの Domain / Environment を LOCAL_ENV に移行する", () => {
+    expect(normalizeEnvironmentSettings({
+      domains: [
+        { id: "one", name: "Domain 1", matchHost: "example.jp", values: [] },
+        { id: "two", name: "Environment 2", matchHost: "example.com", values: [] },
+      ],
+      activeDomainId: "one",
+    })).toEqual({
+      domains: [
+        { id: "one", name: "LOCAL_ENV", matchHost: "example.jp", values: [] },
+        { id: "two", name: "LOCAL_ENV_2", matchHost: "example.com", values: [] },
+      ],
+      activeDomainId: "one",
     });
   });
 });
@@ -24,13 +41,31 @@ describe("getActiveEnvironmentDomain", () => {
   it("activeDomainId に対応する domain を返す", () => {
     expect(getActiveEnvironmentDomain({
       domains: [
-        { id: "jp", name: "Japan", values: [{ key: "TOKEN", value: "jp-token" }] },
-        { id: "us", name: "US", values: [{ key: "TOKEN", value: "us-token" }] },
+        { id: "jp", name: "Japan", matchHost: "example.jp", values: [{ key: "TOKEN", value: "jp-token" }] },
+        { id: "us", name: "US", matchHost: "example.com", values: [{ key: "TOKEN", value: "us-token" }] },
       ],
       activeDomainId: "us",
     })).toEqual({
       id: "us",
       name: "US",
+      matchHost: "example.com",
+      values: [{ key: "TOKEN", value: "us-token" }],
+    });
+  });
+});
+
+describe("getMatchingEnvironmentDomain", () => {
+  it("URL の hostname 完全一致で domain を返す", () => {
+    expect(getMatchingEnvironmentDomain({
+      domains: [
+        { id: "jp", name: "Japan", matchHost: "example.jp", values: [{ key: "TOKEN", value: "jp-token" }] },
+        { id: "us", name: "US", matchHost: "example.com", values: [{ key: "TOKEN", value: "us-token" }] },
+      ],
+      activeDomainId: "jp",
+    }, "https://example.com/login")).toEqual({
+      id: "us",
+      name: "US",
+      matchHost: "example.com",
       values: [{ key: "TOKEN", value: "us-token" }],
     });
   });
@@ -44,7 +79,7 @@ describe("resolveEnvironmentWithSettings", () => {
   it("active domain の values が process env より優先する", () => {
     const resolved = resolveEnvironmentWithSettings(
       { HOST: "process.example.com", TOKEN: "process-token" },
-      { domains: [{ id: "default", name: "Default", values: [{ key: "HOST", value: "domain.example.com" }, { key: "TOKEN", value: "domain-token" }, { key: "MODE", value: "staging" }] }] },
+      { domains: [{ id: "default", name: "Default", matchHost: "example.com", values: [{ key: "HOST", value: "domain.example.com" }, { key: "TOKEN", value: "domain-token" }, { key: "MODE", value: "staging" }] }] },
     );
 
     expect(resolved).toEqual({
@@ -59,8 +94,8 @@ describe("resolveEnvironmentWithSettings", () => {
       { HOST: "process.example.com", TOKEN: "process-token" },
       {
         domains: [
-          { id: "jp", name: "Japan", values: [{ key: "TOKEN", value: "jp-token" }] },
-          { id: "us", name: "US", values: [{ key: "TOKEN", value: "us-token" }, { key: "REGION", value: "us-east-1" }] },
+          { id: "jp", name: "Japan", matchHost: "example.jp", values: [{ key: "TOKEN", value: "jp-token" }] },
+          { id: "us", name: "US", matchHost: "example.com", values: [{ key: "TOKEN", value: "us-token" }, { key: "REGION", value: "us-east-1" }] },
         ],
         activeDomainId: "us",
       },
@@ -87,7 +122,7 @@ describe("inspectEnvironmentSource", () => {
     expect(
       inspectEnvironmentSource(
         { HOST: "process.example.com" },
-        { domains: [{ id: "default", name: "Default", values: [{ key: "API_KEY", value: "secret" }, { key: "TOKEN", value: "domain-token" }] }] },
+        { domains: [{ id: "default", name: "Default", matchHost: "example.com", values: [{ key: "API_KEY", value: "secret" }, { key: "TOKEN", value: "domain-token" }] }] },
       ),
     ).toEqual({
       mode: "domain-values",
@@ -100,7 +135,7 @@ describe("inspectEnvironmentSource", () => {
     expect(
       inspectEnvironmentSource(
         { HOST: "process.example.com" },
-        { domains: [{ id: "default", name: "Default", values: [{ key: "API_KEY", value: "secret" }, { key: "REGION", value: "ap-northeast-1" }] }] },
+        { domains: [{ id: "default", name: "Default", matchHost: "example.com", values: [{ key: "API_KEY", value: "secret" }, { key: "REGION", value: "ap-northeast-1" }] }] },
       ),
     ).toEqual({
       mode: "domain-values",

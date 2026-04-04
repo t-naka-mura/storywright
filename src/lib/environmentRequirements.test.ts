@@ -20,12 +20,12 @@ function createStory(id: string, title: string, overrides?: Partial<Story>): Sto
 
 describe("extractEnvironmentVariableNames", () => {
   it("文字列から ENV 変数名を抽出する", () => {
-    expect(extractEnvironmentVariableNames("https://{{ENV.HOST}}/api/{{ENV.VERSION}}"))
+    expect(extractEnvironmentVariableNames("https://{{LOCAL_ENV.HOST}}/api/{{LOCAL_ENV.VERSION}}"))
       .toEqual(["HOST", "VERSION"]);
   });
 
   it("重複を除いて返す", () => {
-    expect(extractEnvironmentVariableNames("{{ENV.USER}}-{{ENV.USER}}"))
+    expect(extractEnvironmentVariableNames("{{LOCAL_ENV.USER}}-{{LOCAL_ENV.USER}}"))
       .toEqual(["USER"]);
   });
 
@@ -38,10 +38,10 @@ describe("collectEnvironmentRequirements", () => {
   it("baseUrl, target, value から必要変数を集約する", () => {
     const stories = {
       login: createStory("login", "Login", {
-        baseUrl: "https://{{ENV.HOST}}",
+        baseUrl: "https://{{LOCAL_ENV.HOST}}",
         steps: [
-          createStep({ id: "step-1", order: 1, action: "navigate", target: "/{{ENV.PATH}}", value: "" }),
-          createStep({ id: "step-2", order: 2, action: "type", target: "#user", value: "{{ENV.USERNAME}}" }),
+          createStep({ id: "step-1", order: 1, action: "navigate", target: "/{{LOCAL_ENV.PATH}}", value: "" }),
+          createStep({ id: "step-2", order: 2, action: "type", target: "#user", value: "{{LOCAL_ENV.USERNAME}}" }),
         ],
       }),
     };
@@ -54,21 +54,21 @@ describe("collectEnvironmentRequirements", () => {
     expect(result).toEqual([
       {
         name: "HOST",
-        displayName: "ENV.HOST",
+        displayName: "LOCAL_ENV.HOST",
         status: "available",
         occurrenceCount: 1,
         stories: [{ storyId: "login", storyTitle: "Login" }],
       },
       {
         name: "PATH",
-        displayName: "ENV.PATH",
+        displayName: "LOCAL_ENV.PATH",
         status: "missing",
         occurrenceCount: 1,
         stories: [{ storyId: "login", storyTitle: "Login" }],
       },
       {
         name: "USERNAME",
-        displayName: "ENV.USERNAME",
+        displayName: "LOCAL_ENV.USERNAME",
         status: "available",
         occurrenceCount: 1,
         stories: [{ storyId: "login", storyTitle: "Login" }],
@@ -80,8 +80,8 @@ describe("collectEnvironmentRequirements", () => {
     const stories = {
       login: createStory("login", "Login", {
         steps: [
-          createStep({ id: "step-1", order: 1, action: "type", target: "#a", value: "{{ENV.USERNAME}}" }),
-          createStep({ id: "step-2", order: 2, action: "type", target: "#b", value: "{{ENV.USERNAME}}" }),
+          createStep({ id: "step-1", order: 1, action: "type", target: "#a", value: "{{LOCAL_ENV.USERNAME}}" }),
+          createStep({ id: "step-2", order: 2, action: "type", target: "#b", value: "{{LOCAL_ENV.USERNAME}}" }),
         ],
       }),
     };
@@ -95,10 +95,10 @@ describe("collectEnvironmentRequirements", () => {
   it("複数 Story での利用を title 順に返す", () => {
     const stories = {
       b: createStory("b", "Checkout", {
-        steps: [createStep({ id: "step-1", order: 1, action: "type", target: "#a", value: "{{ENV.API_TOKEN}}" })],
+        steps: [createStep({ id: "step-1", order: 1, action: "type", target: "#a", value: "{{LOCAL_ENV.API_TOKEN}}" })],
       }),
       a: createStory("a", "Login", {
-        steps: [createStep({ id: "step-2", order: 1, action: "type", target: "#b", value: "{{ENV.API_TOKEN}}" })],
+        steps: [createStep({ id: "step-2", order: 1, action: "type", target: "#b", value: "{{LOCAL_ENV.API_TOKEN}}" })],
       }),
     };
 
@@ -125,17 +125,17 @@ describe("collectEnvironmentRequirements", () => {
 describe("getMissingEnvironmentRequirementsForStory", () => {
   it("対象 Story の missing requirements のみ返す", () => {
     const story = createStory("login", "Login", {
-      baseUrl: "https://{{ENV.HOST}}",
+      baseUrl: "https://{{LOCAL_ENV.HOST}}",
       steps: [
-        createStep({ id: "step-1", order: 1, action: "type", target: "#user", value: "{{ENV.USERNAME}}" }),
-        createStep({ id: "step-2", order: 2, action: "type", target: "#pass", value: "{{ENV.PASSWORD}}" }),
+        createStep({ id: "step-1", order: 1, action: "type", target: "#user", value: "{{LOCAL_ENV.USERNAME}}" }),
+        createStep({ id: "step-2", order: 2, action: "type", target: "#pass", value: "{{LOCAL_ENV.PASSWORD}}" }),
       ],
     });
 
     expect(getMissingEnvironmentRequirementsForStory(story, { HOST: "example.com", USERNAME: "admin" })).toEqual([
       {
         name: "PASSWORD",
-        displayName: "ENV.PASSWORD",
+        displayName: "LOCAL_ENV.PASSWORD",
         status: "missing",
         occurrenceCount: 1,
         stories: [{ storyId: "login", storyTitle: "Login" }],
@@ -148,15 +148,15 @@ describe("createEnvironmentSetupGuide", () => {
   it("ENV requirement があれば setup guide を返す", () => {
     const guide = createEnvironmentSetupGuide({
       storyA: createStory("storyA", "Login", {
-        steps: [createStep({ id: "step-1", order: 1, action: "type", target: "#pass", value: "{{ENV.PASSWORD}}" })],
+        steps: [createStep({ id: "step-1", order: 1, action: "type", target: "#pass", value: "{{LOCAL_ENV.PASSWORD}}" })],
       }),
       storyB: createStory("storyB", "API", {
-        steps: [createStep({ id: "step-2", order: 1, action: "type", target: "#token", value: "{{ENV.API_TOKEN}}" })],
+        steps: [createStep({ id: "step-2", order: 1, action: "type", target: "#token", value: "{{LOCAL_ENV.API_TOKEN}}" })],
       }),
     });
 
     expect(guide).toEqual({
-      requirements: ["ENV.API_TOKEN", "ENV.PASSWORD"],
+      requirements: ["LOCAL_ENV.API_TOKEN", "LOCAL_ENV.PASSWORD"],
       footer: "Open Settings to add local values or import a .env file.",
     });
   });

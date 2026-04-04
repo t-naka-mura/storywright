@@ -99,7 +99,7 @@ export function serializeStories(stories: Record<string, Story>): StoryDocument 
 }
 
 function hasEnvPlaceholder(value: string): boolean {
-  return /\{\{\s*ENV\.[A-Z0-9_]+\s*\}\}/i.test(value);
+  return /\{\{\s*LOCAL_ENV\.[A-Z0-9_]+\s*\}\}/i.test(value);
 }
 
 function sanitizeStepForShareExport(step: Step): Step {

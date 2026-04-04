@@ -3,12 +3,12 @@ import { resolveEnvPlaceholders, resolveStoryEnvironmentVariables } from "./reso
 
 describe("resolveEnvPlaceholders", () => {
   it("単一の環境変数プレースホルダを解決する", () => {
-    expect(resolveEnvPlaceholders("{{ENV.USERNAME}}", { USERNAME: "admin" })).toBe("admin");
+    expect(resolveEnvPlaceholders("{{LOCAL_ENV.USERNAME}}", { USERNAME: "admin" })).toBe("admin");
   });
 
   it("複数の環境変数が混在する文字列を解決する", () => {
     expect(
-      resolveEnvPlaceholders("https://{{ENV.HOST}}/api/{{ENV.VERSION}}", {
+      resolveEnvPlaceholders("https://{{LOCAL_ENV.HOST}}/api/{{LOCAL_ENV.VERSION}}", {
         HOST: "example.com",
         VERSION: "v1",
       }),
@@ -16,7 +16,7 @@ describe("resolveEnvPlaceholders", () => {
   });
 
   it("未定義の環境変数参照はエラーにする", () => {
-    expect(() => resolveEnvPlaceholders("{{ENV.PASSWORD}}", {})).toThrow(
+    expect(() => resolveEnvPlaceholders("{{LOCAL_ENV.PASSWORD}}", {})).toThrow(
       "Environment variable is not defined: PASSWORD",
     );
   });
@@ -28,19 +28,19 @@ describe("resolveStoryEnvironmentVariables", () => {
       {
         id: "story-1",
         title: "Login Story",
-        baseUrl: "https://{{ENV.HOST}}",
+        baseUrl: "https://{{LOCAL_ENV.HOST}}",
         steps: [
           {
             order: 1,
             action: "navigate",
-            target: "/{{ENV.PATH}}",
+            target: "/{{LOCAL_ENV.PATH}}",
             value: "",
           },
           {
             order: 2,
             action: "type",
-            target: "#username-{{ENV.SUFFIX}}",
-            value: "{{ENV.USERNAME}}",
+            target: "#username-{{LOCAL_ENV.SUFFIX}}",
+            value: "{{LOCAL_ENV.USERNAME}}",
           },
         ],
       },

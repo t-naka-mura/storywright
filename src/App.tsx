@@ -12,7 +12,15 @@ import {
   type EnvironmentRequirement,
 } from "./lib/environmentRequirements";
 import { useUrlHistory } from "./hooks/useUrlHistory";
-import { createStep, createStoryMetadata, normalizeStoriesData, normalizeStory, serializeStories } from "./lib/storyDocument";
+import {
+  createExportStoryDocument,
+  createStep,
+  createStoryMetadata,
+  mergeImportedStories,
+  normalizeStoriesData,
+  normalizeStory,
+  serializeStories,
+} from "./lib/storyDocument";
 import "./App.css";
 
 const defaultStories: Record<string, Story> = {};
@@ -27,11 +35,27 @@ type AppErrorState = {
 
 let storyIdCounter = 0;
 
-function getEnvironmentFilePaths(settings: EnvironmentSettings): string[] {
-  if (settings.envFilePaths && settings.envFilePaths.length > 0) {
-    return settings.envFilePaths;
+function toPortableFilename(title: string): string {
+  const base = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `${base || "story"}.storywright.json`;
+}
+
+function getActiveEnvironmentDomain(settings: EnvironmentSettings) {
+  if (settings.domains && settings.domains.length > 0) {
+    return settings.domains.find((domain) => domain.id === settings.activeDomainId) ?? settings.domains[0];
   }
-  return settings.envFilePath ? [settings.envFilePath] : [];
+  return null;
+}
+
+function getEnvironmentValuesKey(settings: EnvironmentSettings): string {
+  return (getActiveEnvironmentDomain(settings)?.values ?? [])
+    .map(({ key, value }) => `${key}=${value}`)
+    .join("\n");
 }
 
 function App() {
@@ -57,7 +81,7 @@ function App() {
   const unsubAssertDoneRef = useRef<(() => void) | null>(null);
 
   const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
-  const environmentFilePathsKey = getEnvironmentFilePaths(environmentSettings).join("\n");
+  const environmentValuesKey = getEnvironmentValuesKey(environmentSettings);
 
   // 起動時にファイルからデータを読み込み
   useEffect(() => {
@@ -98,7 +122,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [environmentFilePathsKey]);
+  }, [environmentValuesKey]);
 
   useEffect(() => {
     const draftRequirements = collectEnvironmentRequirements(stories, {});
@@ -132,7 +156,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stories, environmentFilePathsKey]);
+  }, [stories, environmentValuesKey]);
 
   const selectedStory = selectedStoryId ? stories[selectedStoryId] ?? null : null;
   const selectedResult = selectedStoryId ? results[selectedStoryId] ?? null : null;
@@ -145,13 +169,95 @@ function App() {
     window.storywright.openSettingsWindow().catch(() => {});
   }, []);
 
+  const handleExportAllStories = useCallback(async () => {
+    const storyCount = Object.keys(stories).length;
+    if (storyCount === 0) {
+      return;
+    }
+
+    try {
+      const filePath = await window.storywright.exportStoriesToFile(
+        createExportStoryDocument(stories),
+        "storywright-stories.storywright.json",
+      );
+      if (!filePath) {
+        return;
+      }
+      setError({
+        title: "Export 完了",
+        message: `${storyCount} stories を export しました。\n\n${filePath}`,
+      });
+    } catch (err) {
+      setError({
+        title: "Export エラー",
+        message: String(err),
+      });
+    }
+  }, [stories]);
+
+  const handleExportStory = useCallback(async (story: Story) => {
+    try {
+      const filePath = await window.storywright.exportStoriesToFile(
+        createExportStoryDocument({ [story.id]: story }),
+        toPortableFilename(story.title),
+      );
+      if (!filePath) {
+        return;
+      }
+      setError({
+        title: "Export 完了",
+        message: `${story.title} を export しました。\n\n${filePath}`,
+      });
+    } catch (err) {
+      setError({
+        title: "Export エラー",
+        message: String(err),
+      });
+    }
+  }, []);
+
+  const handleImportStories = useCallback(async () => {
+    try {
+      const importedData = await window.storywright.importStoriesFromFile();
+      if (!importedData) {
+        return;
+      }
+
+      const result = mergeImportedStories(stories, importedData);
+      if (result.importedCount === 0) {
+        setError({
+          title: "Import エラー",
+          message: "Story が含まれていないため import できませんでした。",
+        });
+        return;
+      }
+
+      setStories(result.stories);
+      if (result.firstImportedStoryId) {
+        setSelectedStoryId(result.firstImportedStoryId);
+      }
+
+      setError({
+        title: "Import 完了",
+        message:
+          `${result.importedCount} stories を取り込みました。` +
+          (result.duplicatedCount > 0 ? `\n${result.duplicatedCount} stories は imported copy として追加しました。` : ""),
+      });
+    } catch (err) {
+      setError({
+        title: "Import エラー",
+        message: String(err),
+      });
+    }
+  }, [stories]);
+
   const handleSaveEnvironmentSettings = useCallback(async (nextSettings: EnvironmentSettings) => {
     await window.storywright.saveLocalState("environment", nextSettings);
     setEnvironmentSettings(nextSettings);
   }, []);
 
-  const handleChooseEnvironmentFile = useCallback(async () => {
-    return window.storywright.chooseEnvironmentFile();
+  const handleImportEnvironmentFile = useCallback(async () => {
+    return window.storywright.importEnvironmentFile();
   }, []);
 
   const ensureEnvironmentRequirementsAvailable = useCallback(async (story: Story) => {
@@ -428,7 +534,7 @@ function App() {
           environmentSettingsError={environmentSettingsError}
           environmentSourceStatus={environmentSourceStatus}
           onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
-          onChooseEnvironmentFile={handleChooseEnvironmentFile}
+          onImportEnvironmentFile={handleImportEnvironmentFile}
         />
       </div>
     );
@@ -441,10 +547,13 @@ function App() {
         isPanelOpen={isPanelOpen}
         isRecording={isRecording}
         isAssertMode={isAssertMode}
+        onImportStories={handleImportStories}
+        onExportAllStories={handleExportAllStories}
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onToggleAssertMode={handleToggleAssertMode}
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
+        canExportStories={Object.keys(stories).length > 0}
       />
       <div className="main-area">
         <>
@@ -478,6 +587,7 @@ function App() {
             onDeselectStory={handleDeselectStory}
             onDeleteStory={handleDeleteStory}
             onOpenSettings={handleOpenSettingsWindow}
+            onExportStory={handleExportStory}
           />
         </>
       </div>

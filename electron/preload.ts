@@ -5,14 +5,18 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("stories:save", data),
   loadStories: () =>
     ipcRenderer.invoke("stories:load"),
+  exportStoriesToFile: (data: unknown, suggestedFileName?: string) =>
+    ipcRenderer.invoke("stories:export", data, suggestedFileName),
+  importStoriesFromFile: () =>
+    ipcRenderer.invoke("stories:import"),
   getEnvironmentVariablePresence: (names: string[]) =>
     ipcRenderer.invoke("environment:get-presence", names),
   getEnvironmentSourceStatus: () =>
     ipcRenderer.invoke("environment:get-source-status"),
   openSettingsWindow: () =>
     ipcRenderer.invoke("app:open-settings"),
-  chooseEnvironmentFile: () =>
-    ipcRenderer.invoke("environment:choose-file"),
+  importEnvironmentFile: () =>
+    ipcRenderer.invoke("environment:import-file"),
   saveLocalState: (key: "urlHistory" | "environment", data: unknown) =>
     ipcRenderer.invoke("local-state:save", key, data),
   loadLocalState: (key: "urlHistory" | "environment") =>

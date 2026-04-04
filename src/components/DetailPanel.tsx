@@ -22,6 +22,7 @@ interface DetailPanelProps {
   onDeselectStory?: () => void;
   onDeleteStory?: (storyId: string) => void;
   onOpenSettings?: () => void;
+  onExportStory?: (story: Story) => void;
 }
 
 function createEmptyStep(order: number): Step {
@@ -50,6 +51,7 @@ export function DetailPanel({
   onDeselectStory,
   onDeleteStory,
   onOpenSettings,
+  onExportStory,
 }: DetailPanelProps) {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -363,6 +365,13 @@ export function DetailPanel({
 
       {story && (
         <div className="panel-actions">
+          <div className="panel-secondary-actions">
+            {onExportStory && (
+              <button className="btn" type="button" onClick={() => onExportStory(story)}>
+                Export
+              </button>
+            )}
+          </div>
           <label className="panel-checkbox">
             <input
               type="checkbox"

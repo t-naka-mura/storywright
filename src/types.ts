@@ -29,16 +29,31 @@ export interface StoryDocument {
   exportedAt?: string;
 }
 
+export interface EnvironmentDomainValue {
+  key: string;
+  value: string;
+}
+
+export interface EnvironmentDomain {
+  id: string;
+  name: string;
+  values: EnvironmentDomainValue[];
+}
+
 export interface EnvironmentSettings {
-  envFilePaths?: string[];
-  envFilePath?: string;
+  domains?: EnvironmentDomain[];
+  activeDomainId?: string;
+}
+
+export interface ImportedEnvironmentValues {
+  filePath: string;
+  values: EnvironmentDomainValue[];
 }
 
 export interface EnvironmentSourceStatus {
-  mode: "process-env" | "env-files";
-  envFilePaths?: string[];
+  mode: "process-env" | "domain-values";
   loadedVariableCount: number;
-  loadedFileCount: number;
+  inlineValueCount: number;
   error?: string;
 }
 
@@ -116,12 +131,14 @@ export type PreviewState = {
 export interface StorywrightAPI {
   saveStories: (data: StoryDocument) => Promise<void>;
   loadStories: () => Promise<unknown>;
+  exportStoriesToFile: (data: StoryDocument, suggestedFileName?: string) => Promise<string | null>;
+  importStoriesFromFile: () => Promise<unknown | null>;
   saveLocalState: (key: LocalStateKey, data: unknown) => Promise<void>;
   loadLocalState: (key: LocalStateKey) => Promise<unknown>;
   getEnvironmentVariablePresence: (names: string[]) => Promise<EnvironmentPresenceMap>;
   getEnvironmentSourceStatus: () => Promise<EnvironmentSourceStatus>;
   openSettingsWindow: () => Promise<void>;
-  chooseEnvironmentFile: () => Promise<string | null>;
+  importEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;
   runStory: (storyJson: string, keepSession?: boolean) => Promise<StoryResult>;
   runStoryRepeat: (storyJson: string, repeatCount: number, keepSession?: boolean) => Promise<RepeatResult>;
   cancelRun: () => Promise<void>;

@@ -1,102 +1,108 @@
-import { parse } from "dotenv";
-import fs from "fs";
+export interface EnvironmentDomainValueLike {
+  key: string;
+  value: string;
+}
+
+export interface EnvironmentDomainLike {
+  id?: string;
+  name?: string;
+  values?: EnvironmentDomainValueLike[];
+}
 
 export interface EnvironmentSettingsLike {
-  envFilePaths?: string[];
-  envFilePath?: string;
+  domains?: EnvironmentDomainLike[];
+  activeDomainId?: string;
 }
 
 export interface EnvironmentSourceStatusLike {
-  mode: "process-env" | "env-files";
-  envFilePaths?: string[];
+  mode: "process-env" | "domain-values";
   loadedVariableCount: number;
-  loadedFileCount: number;
+  inlineValueCount: number;
   error?: string;
 }
 
-export function normalizeEnvironmentSettings(settings: EnvironmentSettingsLike | null | undefined): EnvironmentSettingsLike {
-  const envFilePaths = [
-    ...(settings?.envFilePaths ?? []),
-    ...(settings?.envFilePath ? [settings.envFilePath] : []),
-  ]
-    .map((envFilePath) => envFilePath.trim())
-    .filter((envFilePath, index, array) => envFilePath.length > 0 && array.indexOf(envFilePath) === index);
+function normalizeEnvironmentDomainValues(values: EnvironmentDomainValueLike[] | undefined): EnvironmentDomainValueLike[] {
+  const seenKeys = new Set<string>();
 
-  return envFilePaths.length > 0 ? { envFilePaths } : {};
+  return (values ?? [])
+    .map((entry) => ({ key: entry.key.trim(), value: entry.value }))
+    .filter((entry) => {
+      if (entry.key.length === 0 || seenKeys.has(entry.key)) {
+        return false;
+      }
+      seenKeys.add(entry.key);
+      return true;
+    });
+}
+
+function normalizeEnvironmentDomains(settings: EnvironmentSettingsLike | null | undefined): EnvironmentDomainLike[] {
+  const sourceDomains = settings?.domains ?? [];
+
+  return sourceDomains.map((domain, index) => {
+    const id = domain.id?.trim() || `domain-${index + 1}`;
+    const name = domain.name?.trim() || `Domain ${index + 1}`;
+    const values = normalizeEnvironmentDomainValues(domain.values);
+
+    return {
+      id,
+      name,
+      values,
+    };
+  });
+}
+
+export function getActiveEnvironmentDomain(settings: EnvironmentSettingsLike | null | undefined): EnvironmentDomainLike | null {
+  const domains = normalizeEnvironmentDomains(settings);
+  if (domains.length === 0) {
+    return null;
+  }
+
+  const activeDomainId = settings?.activeDomainId?.trim();
+  return domains.find((domain) => domain.id === activeDomainId) ?? domains[0];
+}
+
+export function normalizeEnvironmentSettings(settings: EnvironmentSettingsLike | null | undefined): EnvironmentSettingsLike {
+  const domains = normalizeEnvironmentDomains(settings);
+  const activeDomain = getActiveEnvironmentDomain({ ...settings, domains });
+
+  return {
+    ...(domains.length > 0 ? { domains } : {}),
+    ...(activeDomain ? { activeDomainId: activeDomain.id } : {}),
+  };
 }
 
 function resolveEnvironmentLayers(
   baseEnv: NodeJS.ProcessEnv,
   settings: EnvironmentSettingsLike | null | undefined,
-  readFileSync: (path: string, encoding: BufferEncoding) => string,
-): { resolvedEnv: NodeJS.ProcessEnv; envFilePaths: string[] } {
+): { resolvedEnv: NodeJS.ProcessEnv } {
   const normalized = normalizeEnvironmentSettings(settings);
-  if (!normalized.envFilePaths || normalized.envFilePaths.length === 0) {
-    return {
-      resolvedEnv: { ...baseEnv },
-      envFilePaths: [],
-    };
-  }
-
-  let resolvedEnv: NodeJS.ProcessEnv = { ...baseEnv };
-  for (const envFilePath of normalized.envFilePaths) {
-    let fileContent: string;
-    try {
-      fileContent = readFileSync(envFilePath, "utf-8");
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to load .env file ${envFilePath}: ${reason}`);
-    }
-
-    resolvedEnv = {
-      ...resolvedEnv,
-      ...parse(fileContent),
-    };
-  }
+  const activeDomain = getActiveEnvironmentDomain(normalized);
+  const inlineEnvValues = Object.fromEntries((activeDomain?.values ?? []).map((entry) => [entry.key, entry.value]));
 
   return {
-    resolvedEnv,
-    envFilePaths: normalized.envFilePaths,
+    resolvedEnv: { ...baseEnv, ...inlineEnvValues },
   };
 }
 
 export function resolveEnvironmentWithSettings(
   baseEnv: NodeJS.ProcessEnv,
   settings: EnvironmentSettingsLike | null | undefined,
-  readFileSync: (path: string, encoding: BufferEncoding) => string = fs.readFileSync,
 ): NodeJS.ProcessEnv {
-  return resolveEnvironmentLayers(baseEnv, settings, readFileSync).resolvedEnv;
+  return resolveEnvironmentLayers(baseEnv, settings).resolvedEnv;
 }
 
 export function inspectEnvironmentSource(
   baseEnv: NodeJS.ProcessEnv,
   settings: EnvironmentSettingsLike | null | undefined,
-  readFileSync: (path: string, encoding: BufferEncoding) => string = fs.readFileSync,
 ): EnvironmentSourceStatusLike {
   const normalized = normalizeEnvironmentSettings(settings);
-  if (!normalized.envFilePaths || normalized.envFilePaths.length === 0) {
-    return {
-      mode: "process-env",
-      loadedVariableCount: Object.keys(baseEnv).length,
-      loadedFileCount: 0,
-    };
-  }
+  const activeDomain = getActiveEnvironmentDomain(normalized);
+  const inlineValueCount = activeDomain?.values?.length ?? 0;
+  const { resolvedEnv } = resolveEnvironmentLayers(baseEnv, normalized);
 
-  try {
-    const { resolvedEnv, envFilePaths } = resolveEnvironmentLayers(baseEnv, normalized, readFileSync);
-    return {
-      mode: "env-files",
-      envFilePaths,
-      loadedVariableCount: Object.keys(resolvedEnv).length,
-      loadedFileCount: envFilePaths.length,
-    };
-  } catch (error) {
-    return {
-      mode: "env-files",
-      envFilePaths: normalized.envFilePaths,
-      loadedVariableCount: 0,
-      loadedFileCount: 0,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+  return {
+    mode: inlineValueCount > 0 ? "domain-values" : "process-env",
+    loadedVariableCount: Object.keys(resolvedEnv).length,
+    inlineValueCount,
+  };
 }

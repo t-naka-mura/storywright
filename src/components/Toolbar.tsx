@@ -3,10 +3,13 @@ interface ToolbarProps {
   isPanelOpen: boolean;
   isRecording: boolean;
   isAssertMode: boolean;
+  onImportStories: () => void;
+  onExportAllStories: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onToggleAssertMode: () => void;
   canRecord: boolean;
+  canExportStories: boolean;
 }
 
 export function Toolbar({
@@ -14,10 +17,13 @@ export function Toolbar({
   isPanelOpen,
   isRecording,
   isAssertMode,
+  onImportStories,
+  onExportAllStories,
   onStartRecording,
   onStopRecording,
   onToggleAssertMode,
   canRecord,
+  canExportStories,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -26,6 +32,12 @@ export function Toolbar({
         <span className="toolbar-title">Storywright</span>
       </div>
       <div className="toolbar-right">
+        <button className="btn" type="button" onClick={onImportStories}>
+          Import
+        </button>
+        <button className="btn" type="button" onClick={onExportAllStories} disabled={!canExportStories}>
+          Export All
+        </button>
         {isRecording ? (
             <>
               <button

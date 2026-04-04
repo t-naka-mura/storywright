@@ -1,7 +1,17 @@
 # ADR-018: Environment Requirements を表示する Settings surface
 
 - 日付: 2026-04-04
-- ステータス: 提案
+- ステータス: 不採用（ADR-016 に統合）
+
+## 結論
+
+Settings surface を独立 ADR として分けるのはやめる。
+
+- env 管理 UI は ADR-016 の継続実装として扱う
+- ユーザーに見せる主概念は env source の優先順位ではなく、ドメイン / 環境ごとの設定セットとする
+- `.env` アップロードと UI からの直接変数追加は、その設定セットの中で扱う
+
+このファイルは、独立 Settings ADR を立てる案があった記録としてのみ残す。
 
 ## 実装進捗サマリ（2026-04-04 時点）
 
@@ -26,8 +36,8 @@
 
 ### 現在地
 
-ADR-018 の Phase 1 は最小成立している。
-加えて ordered な `.env` パス指定の最小 UI まで入ったが、現状はまだ diagnostics 中心であり、settings platform としては初期段階である。
+実装済みの Settings window と diagnostics UI 自体は継続利用する。
+ただし、今後の仕様整理は ADR-016 の中で進める。
 
 ## Context (背景)
 

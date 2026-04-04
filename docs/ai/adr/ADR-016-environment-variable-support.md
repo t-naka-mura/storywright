@@ -14,19 +14,20 @@
 - Settings surface での `available` / `missing` 可視化
 - 実行前に `missing` を検知して block し、Settings を案内する導線
 - Step 編集中 / Base URL 編集中に `ENV.*` 利用を示し、Settings を開ける導線
-- 複数 `.env` ファイルパスの指定と、その値を `process.env` より優先して解決する基盤
-- `.env` 読み込み成功/失敗を Settings 上で確認できる status 表示
+- Settings での domain 切り替えと local key/value 管理
+- `.env` を active domain の key/value に取り込む基盤
 
 ### まだ未実装
 
-- `.env` ファイルの存在確認・検証 UX の改善
+- key/value 編集 UI の行単位編集化
 - `{{ENV.*}}` を含む step への `sensitive: true` 自動提案の強化
 - import/export 時の setup guide 生成
 
 ### 現在地
 
-ADR-016 の Phase 1 は概ね実装済み。
-Phase 2 も最小形を越えて、ordered な複数 `.env` ファイル指定まで実装済みである。未完了なのは validation UX と setup 導線の磨き込みである。
+`ENV.*` の実行基盤はできている。
+Settings では domain ごとに local key/value を持てる。
+`.env` は継続参照先ではなく、active domain へ値を取り込む手段として扱う。
 
 ## Context (背景)
 
@@ -73,25 +74,25 @@ ADR-016 以前の実装で、`sensitive` フラグによるパスワード等の
 - 実装コストが大きい（変数管理UI、保存ロジック、スコープ管理）
 - 結局アプリ内に機密値が保存される問題は残る
 
-### Option C: `.env` ファイル読み込み
+### Option C: `.env` インポート補助
 
-- プロジェクトルートまたは指定パスの `.env` ファイルを読み込む
-- `{{ENV.変数名}}` でファイル内の値を参照
+- `.env` ファイルを読み込み、アプリ内の local key/value へ取り込む
+- 実行時は取り込まれた key/value を `{{ENV.変数名}}` として参照する
 
 **メリット:**
 - 既存の開発ワークフローとの親和性が高い
 - dotenv のエコシステムを活用できる
 
 **デメリット:**
-- ファイルパスの管理が必要
+- 取り込み後の更新は自動追従しない
 - `.env` ファイル自体のセキュリティ管理はユーザー責任
 
 ## Decision (決定)
 
-**Option A を採用し、将来的に Option C（.env 読み込み）を追加する。**
-
-Phase 1: `{{ENV.変数名}}` による `process.env` 参照
-Phase 2: `.env` ファイルパス指定と読み込み（オプション）
+- Story では引き続き `{{ENV.KEY}}` を使う
+- 実行時に参照する実体は local な key/value として持つ
+- `.env` はその key/value をまとめて入れる補助手段として扱う
+- source の優先順位は内部実装に閉じる
 
 ## 実装方針
 
@@ -115,6 +116,9 @@ ADR-017 は Story の保存境界と export/import の責務を定義する ADR 
 
 この優先順位により、portable export と local secret の併存が可能になる。
 
+ただし、これは実装上のルールであり、Settings UI の主概念にしない。
+UI では「どの source が最後に勝つか」よりも、「どのドメイン / 環境設定を使うか」を先に選べる構造を優先する。
+
 ### Phase 1: 環境変数参照
 
 1. **値の解決**: ステップ実行前に `value` 内の `{{ENV.XXX}}` パターンを `process.env.XXX` で置換
@@ -133,16 +137,11 @@ ADR-017 は Story の保存境界と export/import の責務を定義する ADR 
 - `{{ENV.*}}` を含む step は share export と相性が良い
 - 未解決の `{{ENV.*}}` は import 自体ではなく、実行時の解決エラーとして扱う
 
-### Phase 2: .env ファイルサポート
+### 次の実装
 
-- 設定画面で `.env` ファイルパスを順序付きで指定可能にする
-- 指定がある場合、`process.env` より `.env` ファイル群の値を優先
-- 複数ファイル対応（`.env`, `.env.local`, `.env.production` 等）
-
-実装状況:
-
-- 複数ファイルのパス指定と優先解決は実装済み
-- 追加で必要なのは validation UX と導線改善
+- key/value 編集を textarea から行単位 UI にする
+- domain の追加だけでなく削除や並び整理もできるようにする
+- 将来的にはドメイン / 環境単位で key/value セットを切り替えやすくする
 
 ## テスト戦略
 

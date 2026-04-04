@@ -16,6 +16,10 @@ export function createStepId(): string {
   return createId("step");
 }
 
+export function createStoryId(): string {
+  return createId("story");
+}
+
 export function createStoryMetadata(now = Date.now()): StoryMetadata {
   return { createdAt: now };
 }
@@ -91,5 +95,100 @@ export function serializeStories(stories: Record<string, Story>): StoryDocument 
   return {
     schemaVersion: STORY_SCHEMA_VERSION,
     stories: normalizeStoriesData(stories),
+  };
+}
+
+function hasEnvPlaceholder(value: string): boolean {
+  return /\{\{\s*ENV\.[A-Z0-9_]+\s*\}\}/i.test(value);
+}
+
+function sanitizeStepForShareExport(step: Step): Step {
+  if (!step.sensitive) {
+    return step;
+  }
+
+  if (hasEnvPlaceholder(step.value)) {
+    return step;
+  }
+
+  return {
+    ...step,
+    value: "",
+  };
+}
+
+export function createExportStoryDocument(stories: Record<string, Story>): StoryDocument {
+  const normalizedStories = normalizeStoriesData(stories);
+
+  return {
+    ...serializeStories(
+      Object.fromEntries(
+        Object.entries(normalizedStories).map(([storyId, story]) => [
+          storyId,
+          {
+            ...story,
+            steps: story.steps.map(sanitizeStepForShareExport),
+          },
+        ]),
+      ),
+    ),
+    exportedAt: new Date().toISOString(),
+  };
+}
+
+function createImportedTitle(title: string, stories: Record<string, Story>): string {
+  const existingTitles = new Set(Object.values(stories).map((story) => story.title));
+  if (!existingTitles.has(title)) {
+    return title;
+  }
+
+  let suffix = 1;
+  while (true) {
+    const candidate = suffix === 1 ? `${title} (imported)` : `${title} (imported ${suffix})`;
+    if (!existingTitles.has(candidate)) {
+      return candidate;
+    }
+    suffix += 1;
+  }
+}
+
+export function mergeImportedStories(
+  existingStories: Record<string, Story>,
+  importedData: unknown,
+): {
+  stories: Record<string, Story>;
+  importedCount: number;
+  duplicatedCount: number;
+  firstImportedStoryId: string | null;
+} {
+  const importedStories = normalizeStoriesData(importedData);
+  const mergedStories = { ...existingStories };
+  let importedCount = 0;
+  let duplicatedCount = 0;
+  let firstImportedStoryId: string | null = null;
+
+  for (const story of Object.values(importedStories)) {
+    const nextStory = mergedStories[story.id]
+      ? {
+          ...story,
+          id: createStoryId(),
+          title: createImportedTitle(story.title, mergedStories),
+        }
+      : story;
+
+    if (mergedStories[story.id]) {
+      duplicatedCount += 1;
+    }
+
+    mergedStories[nextStory.id] = normalizeStory(nextStory);
+    importedCount += 1;
+    firstImportedStoryId ??= nextStory.id;
+  }
+
+  return {
+    stories: mergedStories,
+    importedCount,
+    duplicatedCount,
+    firstImportedStoryId,
   };
 }

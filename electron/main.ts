@@ -3,6 +3,7 @@ import { prepareStoriesForPersistence, hydrateStoriesWithSecrets } from "./story
 import { inspectEnvironmentSource, normalizeEnvironmentSettings, resolveEnvironmentWithSettings } from "./environmentConfig";
 
 const { app, BrowserWindow, ipcMain, webContents, nativeImage, safeStorage, WebContentsView, Menu, dialog } = require("electron");
+const { parse: parseDotenv } = require("dotenv");
 const path = require("path");
 const fs = require("fs");
 
@@ -14,8 +15,12 @@ const LOCAL_STATE_FILENAMES = {
 } as const;
 
 type EnvironmentSettings = {
-  envFilePaths?: string[];
-  envFilePath?: string;
+  domains?: Array<{
+    id: string;
+    name: string;
+    values: Array<{ key: string; value: string }>;
+  }>;
+  activeDomainId?: string;
 };
 
 // === データ永続化 ===
@@ -130,6 +135,13 @@ function loadStories<T>(fallback: T): T {
     Object.entries(rawSecrets).map(([key, value]) => [key, decryptValue(value)]),
   );
   return hydrateStoriesWithSecrets(decryptedStories, decryptedSecrets) as T;
+}
+
+function getPortableExportFilename(suggestedFileName?: string): string {
+  if (suggestedFileName && suggestedFileName.trim().length > 0) {
+    return suggestedFileName;
+  }
+  return "storywright-export.storywright.json";
 }
 
 function saveLocalState(key: keyof typeof LOCAL_STATE_FILENAMES, data: unknown): void {
@@ -951,7 +963,7 @@ function registerIpcHandlers() {
     openSettingsWindow();
   });
 
-  ipcMain.handle("environment:choose-file", async () => {
+  ipcMain.handle("environment:import-file", async () => {
     const targetWindow = settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : mainWindow;
     const result = await dialog.showOpenDialog(targetWindow ?? undefined, {
       properties: ["openFile"],
@@ -965,7 +977,20 @@ function registerIpcHandlers() {
       return null;
     }
 
-    return result.filePaths[0];
+    const filePath = result.filePaths[0];
+    let fileContent: string;
+    try {
+      fileContent = fs.readFileSync(filePath, "utf-8");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to read .env file: ${reason}`);
+    }
+
+    const values = Object.entries(parseDotenv(fileContent)).map(([key, value]) => ({ key, value }));
+    return {
+      filePath,
+      values,
+    };
   });
 
   ipcMain.handle("stories:save", async (_event, data: unknown) => {
@@ -974,6 +999,55 @@ function registerIpcHandlers() {
 
   ipcMain.handle("stories:load", async () => {
     return loadStories(null);
+  });
+
+  ipcMain.handle("stories:export", async (_event, data: unknown, suggestedFileName?: string) => {
+    const targetWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : settingsWindow;
+    const result = await dialog.showSaveDialog(targetWindow ?? undefined, {
+      defaultPath: path.join(app.getPath("documents"), getPortableExportFilename(suggestedFileName)),
+      filters: [
+        { name: "Storywright Story", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+
+    fs.writeFileSync(result.filePath, JSON.stringify(data, null, 2), "utf-8");
+    return result.filePath;
+  });
+
+  ipcMain.handle("stories:import", async () => {
+    const targetWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : settingsWindow;
+    const result = await dialog.showOpenDialog(targetWindow ?? undefined, {
+      properties: ["openFile"],
+      filters: [
+        { name: "Storywright Story", extensions: ["json"] },
+        { name: "All Files", extensions: ["*"] },
+      ],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    const filePath = result.filePaths[0];
+    let fileContent: string;
+    try {
+      fileContent = fs.readFileSync(filePath, "utf-8");
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to read import file: ${reason}`);
+    }
+
+    try {
+      return JSON.parse(fileContent);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to parse import file: ${reason}`);
+    }
   });
 
   ipcMain.handle("environment:get-presence", async (_event, names: string[]) => {

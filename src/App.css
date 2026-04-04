@@ -247,6 +247,29 @@ body,
   margin-bottom: 18px;
 }
 
+.settings-domain-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-domain-item {
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-domain-item-active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(91, 123, 215, 0.08);
+}
+
 .settings-nav-item {
   display: flex;
   align-items: center;
@@ -352,6 +375,22 @@ body,
   font-weight: 700;
   color: var(--color-text);
   margin-bottom: 4px;
+}
+
+.settings-domain-name-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-text);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.settings-domain-name-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 .settings-source-row {
@@ -1569,6 +1608,12 @@ li:hover + li .step-insert-zone .btn-insert {
   gap: 8px;
   padding: 16px;
   border-top: 1px solid var(--color-border);
+}
+
+.panel-secondary-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .panel-checkbox {

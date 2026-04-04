@@ -1,19 +1,36 @@
 import { useEffect, useState } from "react";
-import type { EnvironmentSettings, EnvironmentSourceStatus } from "../types";
+import type { EnvironmentSettings, EnvironmentSourceStatus, ImportedEnvironmentValues } from "../types";
 import type { EnvironmentRequirement } from "../lib/environmentRequirements";
 
-function getEnvironmentFilePaths(settings: EnvironmentSettings): string[] {
-  if (settings.envFilePaths && settings.envFilePaths.length > 0) {
-    return settings.envFilePaths;
-  }
-  return settings.envFilePath ? [settings.envFilePath] : [];
+function getEnvironmentDomains(settings: EnvironmentSettings) {
+  return settings.domains ?? [];
 }
 
-function parseEnvironmentFilePaths(draft: string): string[] {
-  return draft
-    .split("\n")
-    .map((envFilePath) => envFilePath.trim())
-    .filter((envFilePath, index, array) => envFilePath.length > 0 && array.indexOf(envFilePath) === index);
+function toEnvironmentValuesDraft(values: Array<{ key: string; value: string }> | undefined): string {
+  return (values ?? [])
+    .slice()
+    .sort((left, right) => left.key.localeCompare(right.key))
+    .map(({ key, value }) => `${key}=${value}`)
+    .join("\n");
+}
+
+function parseEnvironmentValuesDraft(draft: string): Record<string, string> {
+  return Object.fromEntries(
+    draft
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const separatorIndex = line.indexOf("=");
+        if (separatorIndex === -1) {
+          return [line, ""];
+        }
+        const key = line.slice(0, separatorIndex).trim();
+        const value = line.slice(separatorIndex + 1);
+        return [key, value];
+      })
+      .filter(([key]) => key.length > 0),
+  );
 }
 
 interface SettingsPanelProps {
@@ -22,7 +39,7 @@ interface SettingsPanelProps {
   environmentSettingsError: string | null;
   environmentSourceStatus: EnvironmentSourceStatus | null;
   onSaveEnvironmentSettings: (settings: EnvironmentSettings) => Promise<void>;
-  onChooseEnvironmentFile: () => Promise<string | null>;
+  onImportEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;
 }
 
 export function SettingsPanel({
@@ -31,15 +48,46 @@ export function SettingsPanel({
   environmentSettingsError,
   environmentSourceStatus,
   onSaveEnvironmentSettings,
-  onChooseEnvironmentFile,
+  onImportEnvironmentFile,
 }: SettingsPanelProps) {
   const missingCount = requirements.filter((requirement) => requirement.status === "missing").length;
-  const [envFilePathsDraft, setEnvFilePathsDraft] = useState(getEnvironmentFilePaths(environmentSettings).join("\n"));
-  const activeEnvFilePaths = getEnvironmentFilePaths(environmentSettings);
+  const domains = getEnvironmentDomains(environmentSettings);
+  const activeDomain = domains.find((domain) => domain.id === environmentSettings.activeDomainId) ?? domains[0] ?? null;
+  const envValuesKey = toEnvironmentValuesDraft(activeDomain?.values);
+  const [domainNameDraft, setDomainNameDraft] = useState(activeDomain?.name ?? "");
+  const [envValuesDraft, setEnvValuesDraft] = useState(toEnvironmentValuesDraft(activeDomain?.values));
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  function saveDomains(nextDomains: typeof domains, activeDomainId = activeDomain?.id ?? nextDomains[0]?.id) {
+    return onSaveEnvironmentSettings({
+      domains: nextDomains,
+      activeDomainId,
+    });
+  }
+
+  function updateActiveDomain(next: { name?: string; values?: Record<string, string> }) {
+    if (!activeDomain) return Promise.resolve();
+    const nextDomains = domains.map((domain) => {
+      if (domain.id !== activeDomain.id) return domain;
+      return {
+        ...domain,
+        ...(typeof next.name === "string" ? { name: next.name } : {}),
+        ...(next.values ? { values: Object.entries(next.values).map(([key, value]) => ({ key, value })) } : {}),
+      };
+    });
+    return saveDomains(nextDomains, activeDomain.id);
+  }
 
   useEffect(() => {
-    setEnvFilePathsDraft(activeEnvFilePaths.join("\n"));
-  }, [activeEnvFilePaths.join("\n")]);
+    setDomainNameDraft(activeDomain?.name ?? "");
+    setImportSummary(null);
+    setImportError(null);
+  }, [activeDomain?.id, activeDomain?.name]);
+
+  useEffect(() => {
+    setEnvValuesDraft(toEnvironmentValuesDraft(activeDomain?.values));
+  }, [envValuesKey]);
 
   return (
     <section className="settings-panel" aria-label="Settings">
@@ -56,6 +104,33 @@ export function SettingsPanel({
                 <span className="settings-nav-count">{requirements.length}</span>
               </button>
             </nav>
+            <div className="settings-domain-list">
+              {domains.map((domain) => (
+                <button
+                  key={domain.id}
+                  type="button"
+                  className={`settings-domain-item ${domain.id === activeDomain?.id ? "settings-domain-item-active" : ""}`}
+                  onClick={() => {
+                    void saveDomains(domains, domain.id);
+                  }}
+                >
+                  {domain.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                className="settings-text-button"
+                onClick={() => {
+                  const nextId = `domain-${domains.length + 1}`;
+                  void saveDomains(
+                    [...domains, { id: nextId, name: `Domain ${domains.length + 1}`, values: [] }],
+                    nextId,
+                  );
+                }}
+              >
+                Add domain
+              </button>
+            </div>
             <p className="settings-nav-note">
               Story と一緒に export されない local configuration を扱います。
             </p>
@@ -80,88 +155,118 @@ export function SettingsPanel({
 
             <div className="settings-section settings-section-compact">
               <div className="settings-section-header">
-                <h3 className="settings-subsection-title">Environment Source</h3>
+                <input
+                  className="settings-domain-name-input"
+                  value={domainNameDraft}
+                  onChange={(event) => setDomainNameDraft(event.target.value)}
+                  onBlur={() => {
+                    if (!activeDomain) return;
+                    const nextName = domainNameDraft.trim() || activeDomain.name;
+                    if (nextName !== activeDomain.name) {
+                      void updateActiveDomain({ name: nextName });
+                    }
+                  }}
+                  placeholder="Domain name"
+                />
+                <h3 className="settings-subsection-title">Environment Values</h3>
                 <p className="settings-section-description">
-                  `.env` ファイルを上から順に読み込みます。後ろの file ほど優先され、すべて `process.env` より優先して解決されます。
+                  実行で使う key/value を直接入力します。ここに入れた値が最優先で使われます。
                 </p>
               </div>
               <div className="settings-source-row">
                 <textarea
                   className="settings-source-input"
-                  value={envFilePathsDraft}
-                  onChange={(event) => setEnvFilePathsDraft(event.target.value)}
-                  placeholder={`/path/to/.env\n/path/to/.env.local`}
-                  rows={3}
+                  value={envValuesDraft}
+                  onChange={(event) => setEnvValuesDraft(event.target.value)}
+                  placeholder={`API_KEY=secret\nBASE_URL=https://example.com`}
+                  rows={4}
                 />
-                <button className="btn" type="button" onClick={async () => {
-                  const selected = await onChooseEnvironmentFile();
-                  if (!selected) return;
-                  const nextPaths = [...parseEnvironmentFilePaths(envFilePathsDraft), selected]
-                    .filter((envFilePath, index, array) => array.indexOf(envFilePath) === index);
-                  setEnvFilePathsDraft(nextPaths.join("\n"));
-                  await onSaveEnvironmentSettings(nextPaths.length > 0 ? { envFilePaths: nextPaths } : {});
-                }}>
-                  Browse
-                </button>
                 <button
                   className="btn"
                   type="button"
-                  onClick={() => {
-                    const nextPaths = parseEnvironmentFilePaths(envFilePathsDraft);
-                    return onSaveEnvironmentSettings(nextPaths.length > 0 ? { envFilePaths: nextPaths } : {});
-                  }}
+                  onClick={() => void updateActiveDomain({ values: parseEnvironmentValuesDraft(envValuesDraft) })}
                 >
                   Save
                 </button>
               </div>
               <div className="settings-source-meta-row">
                 <span className="settings-source-meta">
-                  {activeEnvFilePaths.length > 0 ? `Using ${activeEnvFilePaths.length} files in order` : "Using process.env only"}
+                  {(activeDomain?.values.length ?? 0) > 0
+                    ? `${activeDomain?.values.length ?? 0} values saved`
+                    : "No inline values yet"}
                 </span>
-                {activeEnvFilePaths.length > 0 && (
+                {(activeDomain?.values.length ?? 0) > 0 && (
                   <button
                     className="settings-text-button"
                     type="button"
                     onClick={() => {
-                      setEnvFilePathsDraft("");
-                      void onSaveEnvironmentSettings({});
+                      setEnvValuesDraft("");
+                      void updateActiveDomain({ values: {} });
                     }}
                   >
                     Clear
                   </button>
                 )}
               </div>
-              {activeEnvFilePaths.length > 0 && (
-                <div className="settings-source-path-list" role="list" aria-label="Configured environment files">
-                  {activeEnvFilePaths.map((envFilePath, index) => (
-                    <div key={envFilePath} className="settings-source-path-item" role="listitem">
-                      <span className="settings-source-path-index">{index + 1}</span>
-                      <span className="settings-source-path-text">{envFilePath}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            </div>
+
+            <div className="settings-section settings-section-compact">
+              <div className="settings-section-header">
+                <h3 className="settings-subsection-title">Import .env</h3>
+                <p className="settings-section-description">
+                  `.env` は active domain の key/value に取り込みます。取り込み後はこの画面でそのまま編集できます。
+                </p>
+              </div>
+              <div className="settings-source-row">
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={async () => {
+                    if (!activeDomain) return;
+                    try {
+                      const imported = await onImportEnvironmentFile();
+                      if (!imported) return;
+                      const mergedValues = Object.fromEntries(
+                        [...(activeDomain.values ?? []), ...imported.values].map(({ key, value }) => [key, value]),
+                      );
+                      setEnvValuesDraft(toEnvironmentValuesDraft(imported.values));
+                      await updateActiveDomain({ values: mergedValues });
+                      setImportSummary(`${imported.filePath} から ${imported.values.length} 件取り込みました`);
+                      setImportError(null);
+                    } catch (error) {
+                      setImportSummary(null);
+                      setImportError(String(error));
+                    }
+                  }}
+                >
+                  Import .env
+                </button>
+              </div>
+              <div className="settings-source-meta-row">
+                <span className="settings-source-meta">
+                  {activeDomain ? "選択中の domain に値を追加します" : "先に domain を作成してください"}
+                </span>
+              </div>
+              {importSummary && <div className="settings-source-meta">{importSummary}</div>}
               {environmentSourceStatus && (
                 <div className="settings-source-status-row">
                   <span className={`settings-source-status-badge ${environmentSourceStatus.error ? "settings-source-status-badge-error" : "settings-source-status-badge-ok"}`}>
                     {environmentSourceStatus.error
                       ? "Load failed"
-                      : environmentSourceStatus.mode === "env-files"
-                        ? `${environmentSourceStatus.loadedFileCount} files active`
+                      : environmentSourceStatus.mode === "domain-values"
+                        ? "Domain values active"
                         : "process.env"}
                   </span>
                   <span className="settings-source-meta">
                     {environmentSourceStatus.error
                       ? "設定を確認してください"
-                      : environmentSourceStatus.mode === "env-files"
-                        ? `${environmentSourceStatus.loadedVariableCount} variables available after ${environmentSourceStatus.loadedFileCount} layers`
-                        : `${environmentSourceStatus.loadedVariableCount} variables available`}
+                      : `${environmentSourceStatus.inlineValueCount} domain values, ${environmentSourceStatus.loadedVariableCount} resolved variables`}
                   </span>
                 </div>
               )}
-              {environmentSettingsError && (
+              {(importError ?? environmentSettingsError) && (
                 <div className="settings-inline-error" role="alert">
-                  {environmentSettingsError}
+                  {importError ?? environmentSettingsError}
                 </div>
               )}
             </div>

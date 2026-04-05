@@ -1,18 +1,18 @@
 # インタラクティブレコーダー Phase 2 仕様
 
-ADR-009 Phase 2: 録画モード基本機能（click / type / navigate の記録）
+ADR-009 Phase 2: 記録モード基本機能（click / type / navigate の記録）
 
 ## 概要
 
 Preview ウィンドウ上でのユーザー操作をリアルタイムにキャプチャし、ステップとして記録する。
-録画した操作は既存の Story データモデルに変換され、そのまま再生（テスト実行）可能。
+記録した操作は既存の Story データモデルに変換され、そのまま再生（テスト実行）可能。
 
 ## アーキテクチャ
 
 ```
 ┌─ Renderer (React) ──────────────────────────────┐
 │  Toolbar: [● REC] [■ Stop]                      │
-│  PreviewPanel: 「録画中...」表示                   │
+│  PreviewPanel: 「記録中...」表示                   │
 │  DetailPanel: リアルタイムでステップが追加される      │
 │                                                   │
 │  ipcRenderer.invoke('start-recording', url)       │
@@ -35,7 +35,7 @@ Preview ウィンドウ上でのユーザー操作をリアルタイムにキャ
 
 ## 技術方式: Electron webContents.debugger
 
-Playwright を録画用に使わず、Preview の BrowserWindow に直接 CDP を接続する。
+Playwright を記録用に使わず、Preview の BrowserWindow に直接 CDP を接続する。
 
 **理由:**
 - Preview ウィンドウは既に BrowserWindow として存在する
@@ -83,8 +83,8 @@ ADR-009 で定義した優先順位:
 
 | チャネル | 方向 | 引数 | 説明 |
 |---------|------|------|------|
-| `start-recording` | renderer → main | `url: string` | 録画開始。Preview を開き CDP 接続 |
-| `stop-recording` | renderer → main | なし | 録画停止。CDP 切断 |
+| `start-recording` | renderer → main | `url: string` | 記録開始。Preview を開き CDP 接続 |
+| `stop-recording` | renderer → main | なし | 記録停止。CDP 切断 |
 | `recorder:step` | main → renderer | `RecordedStep` | キャプチャしたステップを通知 |
 
 ### RecordedStep 型
@@ -103,23 +103,23 @@ interface RecordedStep {
 ### Toolbar
 
 - Preview タブ選択時に **● REC** ボタンを表示
-- 録画中は **■ Stop** ボタンに切り替わる
-- 録画中は REC ボタンが赤く点滅（`recording` クラス）
+- 記録中は **■ Stop** ボタンに切り替わる
+- 記録中は REC ボタンが赤く点滅（`recording` クラス）
 
 ### PreviewPanel
 
-- 録画中は「録画中... ブラウザで操作してください」を表示
-- 録画停止後は「録画完了 — n ステップ記録しました」を表示
+- 記録中は「記録中... ブラウザで操作してください」を表示
+- 記録停止後は「記録完了 — n ステップ記録しました」を表示
 
 ### DetailPanel
 
-- 録画中のステップがリアルタイムで追加表示される
-- 録画で追加されたステップは既存の手動ステップと同じデータ構造
-- 録画停止後、通常通り編集・削除が可能
+- 記録中のステップがリアルタイムで追加表示される
+- 記録で追加されたステップは既存の手動ステップと同じデータ構造
+- 記録停止後、通常通り編集・削除が可能
 
 ### StatusBar
 
-- 録画中: `● Recording...` を表示（赤いドット）
+- 記録中: `● Recording...` を表示（赤いドット）
 - 通常時: 既存の `Ready` 表示
 
 ## 操作フロー
@@ -129,7 +129,7 @@ interface RecordedStep {
 3. Preview ウィンドウが開き、Base URL を読み込む
 4. ユーザーがページ上で操作する（クリック、入力、ページ遷移）
 5. 操作がリアルタイムで DetailPanel にステップとして表示される
-6. **■ Stop** をクリックして録画を終了
+6. **■ Stop** をクリックして記録を終了
 7. 記録されたステップは Story に保存され、▶ Run で再生可能
 
 ## 制約・Phase 2 のスコープ
@@ -149,11 +149,11 @@ interface RecordedStep {
 
 | ファイル | 変更内容 |
 |---------|---------|
-| `electron/main.ts` | 録画 IPC ハンドラ、CDP 接続、インジェクションスクリプト |
+| `electron/main.ts` | 記録 IPC ハンドラ、CDP 接続、インジェクションスクリプト |
 | `electron/preload.ts` | 新規 IPC メソッド追加 |
 | `src/types.ts` | RecordedStep 型、StorywrightAPI 拡張 |
-| `src/App.tsx` | 録画状態管理、recorder:step リスナー |
+| `src/App.tsx` | 記録状態管理、recorder:step リスナー |
 | `src/components/Toolbar.tsx` | REC/Stop ボタン |
-| `src/components/PreviewPanel.tsx` | 録画中の表示切替 |
-| `src/components/StatusBar.tsx` | 録画状態表示 |
-| `src/App.css` | 録画関連スタイル |
+| `src/components/PreviewPanel.tsx` | 記録中の表示切替 |
+| `src/components/StatusBar.tsx` | 記録状態表示 |
+| `src/App.css` | 記録関連スタイル |

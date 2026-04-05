@@ -393,10 +393,10 @@ export function PreviewPanel({
         </div>
       </div>
 
-      {/* 録画バッジ */}
+      {/* 記録バッジ */}
       {isRecording && (
         <div className="preview-recording-badge">
-          <RecordIcon /> 録画中 — {recordedStepCount} ステップ記録済み
+          <RecordIcon /> 記録中 — {recordedStepCount} ステップ記録済み
         </div>
       )}
 

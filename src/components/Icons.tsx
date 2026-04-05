@@ -3,7 +3,7 @@ interface IconProps {
   className?: string;
 }
 
-/** ● 録画インジケータ（塗りつぶし円） */
+/** ● 記録インジケータ（塗りつぶし円） */
 export function RecordIcon({ size = "1em", className }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" className={className}>

@@ -14,7 +14,7 @@ type HelpSection =
 
 const sections: { id: HelpSection; label: string }[] = [
   { id: "getting-started", label: "はじめに" },
-  { id: "recording", label: "録画する" },
+  { id: "recording", label: "記録する" },
   { id: "assertion", label: "アサーションを追加する" },
   { id: "running", label: "テストを実行する" },
   { id: "managing", label: "ストーリーを管理する" },
@@ -153,7 +153,7 @@ export function HelpPanel() {
             <div id="getting-started" className="help-section">
               <h2 className="help-section-title">はじめに</h2>
               <p className="help-paragraph">
-                Storywright は、ブラウザ操作を録画して、そのまま E2E テストとして実行できるデスクトップアプリです。
+                Storywright は、ブラウザ操作を記録して、そのまま E2E テストとして実行できるデスクトップアプリです。
               </p>
               <h3 className="help-subtitle">基本の流れ</h3>
               <ol className="help-steps">
@@ -161,21 +161,21 @@ export function HelpPanel() {
                   <strong>URL を入力</strong> — アドレスバーにテスト対象のサイトの URL を入力して Enter を押します。
                 </li>
                 <li>
-                  <strong>録画する</strong> — ツールバーの <span className="help-inline-icon"><RecordIcon /></span> <strong>REC</strong> ボタンを押して、サイト上でクリックや入力などの操作をします。操作は自動的に記録されます。
+                  <strong>記録する</strong> — ツールバーの <span className="help-inline-icon"><RecordIcon /></span> <strong>REC</strong> ボタンを押して、サイト上でクリックや入力などの操作をします。操作は自動的に記録されます。
                 </li>
                 <li>
-                  <strong>テストを実行する</strong> — <span className="help-inline-icon"><StopIcon /></span> <strong>Stop</strong> で録画を終了し、右パネルの <span className="help-inline-icon"><PlayIcon /></span> <strong>Run</strong> ボタンでテストを実行します。各ステップの成功・失敗が表示されます。
+                  <strong>テストを実行する</strong> — <span className="help-inline-icon"><StopIcon /></span> <strong>Stop</strong> で記録を終了し、右パネルの <span className="help-inline-icon"><PlayIcon /></span> <strong>Run</strong> ボタンでテストを実行します。各ステップの成功・失敗が表示されます。
                 </li>
               </ol>
             </div>
 
-            {/* 録画する */}
+            {/* 記録する */}
             <div id="recording" className="help-section">
-              <h2 className="help-section-title">録画する</h2>
-              <h3 className="help-subtitle">録画の開始と終了</h3>
+              <h2 className="help-section-title">記録する</h2>
+              <h3 className="help-subtitle">記録の開始と終了</h3>
               <ol className="help-steps">
                 <li>アドレスバーにテスト対象の URL を入力して Enter を押します。</li>
-                <li>ツールバーの <span className="help-inline-icon"><RecordIcon /></span> <strong>REC</strong> ボタンを押します。画面上部に「録画中」バッジが表示されます。</li>
+                <li>ツールバーの <span className="help-inline-icon"><RecordIcon /></span> <strong>REC</strong> ボタンを押します。画面上部に「記録中」バッジが表示されます。</li>
                 <li>プレビューエリアでサイトを操作します。クリック・テキスト入力・ページ遷移・セレクトボックスの選択が自動的に記録されます。</li>
                 <li>操作が終わったら <span className="help-inline-icon"><StopIcon /></span> <strong>Stop</strong> ボタンを押します。</li>
               </ol>
@@ -193,7 +193,7 @@ export function HelpPanel() {
               </table>
               <h3 className="help-subtitle">タブと popup</h3>
               <p className="help-paragraph">
-                録画中にリンクが新しいタブや popup ウィンドウで開かれた場合も、自動的に新しいタブとして管理されます。タブの切り替えも記録されるので、popup 内での操作もテストに含まれます。
+                記録中にリンクが新しいタブや popup ウィンドウで開かれた場合も、自動的に新しいタブとして管理されます。タブの切り替えも記録されるので、popup 内での操作もテストに含まれます。
               </p>
               <h3 className="help-subtitle">機密値（パスワードなど）</h3>
               <p className="help-paragraph">
@@ -214,7 +214,7 @@ export function HelpPanel() {
               </p>
               <h3 className="help-subtitle">追加手順</h3>
               <ol className="help-steps">
-                <li>録画中に、ツールバーの <span className="help-inline-icon"><CheckIcon /></span> <strong>Assert</strong> ボタンを押します。</li>
+                <li>記録中に、ツールバーの <span className="help-inline-icon"><CheckIcon /></span> <strong>Assert</strong> ボタンを押します。</li>
                 <li>プレビューエリアで、確認したいテキストが含まれる要素をクリックします。</li>
                 <li>クリックした要素のテキストを確認するアサーションが自動的に追加されます。</li>
                 <li>Assert モードは 1 回の追加後に自動で解除されます。続けて追加したい場合は再度 Assert ボタンを押してください。</li>
@@ -260,7 +260,7 @@ export function HelpPanel() {
               <h2 className="help-section-title">ストーリーを管理する</h2>
               <h3 className="help-subtitle">ストーリー一覧</h3>
               <p className="help-paragraph">
-                右パネルに録画済みのストーリーが一覧表示されます。ストーリーをクリックすると選択でき、ステップの確認や編集ができます。
+                右パネルに記録済みのストーリーが一覧表示されます。ストーリーをクリックすると選択でき、ステップの確認や編集ができます。
               </p>
               <ul className="help-list">
                 <li><strong>並び替え</strong> — 一覧右上のドロップダウンで「新しい順」「古い順」「名前順」に並び替えられます。</li>

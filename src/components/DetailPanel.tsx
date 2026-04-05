@@ -306,14 +306,14 @@ export function DetailPanel({
         ) : (
           <div className="panel-empty-area">
             <p className="panel-empty">
-              <RecordIcon /> REC を押して録画を開始するか、
+              <RecordIcon /> REC を押して記録を開始するか、
               <br />
-              録画済みストーリーを選択してください
+              記録済みストーリーを選択してください
             </p>
             {standaloneStories.length > 0 && (
               <div className="standalone-story-list">
                 <div className="story-list-header">
-                  <label className="panel-field-label">録画済みストーリー</label>
+                  <label className="panel-field-label">記録済みストーリー</label>
                   <select
                     className="story-sort-select"
                     value={sortBy}

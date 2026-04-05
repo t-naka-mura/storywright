@@ -967,7 +967,7 @@ const RECORDER_INJECTION_SCRIPT = `
     if (!enabled) clearHighlight();
   };
 
-  // === 通常の録画キャプチャ ===
+  // === 通常の記録キャプチャ ===
 
   // click capture (アサートモードでない時のみ)
   document.addEventListener('click', function(e) {

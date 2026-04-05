@@ -35,9 +35,9 @@ test("REC creates a runnable story from live preview interactions", async () => 
 
     await mainWindow.getByRole("button", { name: /Stop/ }).click();
 
-    await expect(mainWindow.locator(".panel-header-title")).toContainText("録画 ");
+    await expect(mainWindow.locator(".panel-header-title")).toContainText("記録 ");
 
-    // 録画完了後のステップ数を取得して Run で全ステップ pass を検証
+    // 記録完了後のステップ数を取得して Run で全ステップ pass を検証
     const stepCount = await mainWindow.locator(".step-item").count();
     expect(stepCount).toBeGreaterThanOrEqual(5);
 

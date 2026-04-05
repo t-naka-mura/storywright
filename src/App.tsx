@@ -445,7 +445,7 @@ function App() {
       const now = new Date();
       const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const id = `story-${++storyIdCounter}`;
-      const newStory: Story = { id, title: `録画 ${timestamp}`, steps: [], metadata: createStoryMetadata(Date.now()) };
+      const newStory: Story = { id, title: `記録 ${timestamp}`, steps: [], metadata: createStoryMetadata(Date.now()) };
       setStories((prev) => ({ ...prev, [id]: newStory }));
       setSelectedStoryId(id);
       targetStoryId = id;
@@ -485,7 +485,7 @@ function App() {
       await window.storywright.startRecording();
     } catch (err) {
       setIsRecording(false);
-      setError({ title: "録画開始エラー", message: String(err) });
+      setError({ title: "記録開始エラー", message: String(err) });
     }
   }, [selectedStoryId, isPanelOpen]);
 
@@ -513,7 +513,7 @@ function App() {
     }
   }, [isAssertMode]);
 
-  // 録画中にコンポーネントがアンマウントされた場合のクリーンアップ
+  // 記録中にコンポーネントがアンマウントされた場合のクリーンアップ
   useEffect(() => {
     return () => {
       unsubRecorderRef.current?.();
@@ -557,7 +557,7 @@ function App() {
   }, [selectedStoryId]);
 
   // URL 履歴ロード完了まで空にして、デフォルト値での初回タブ作成を防ぐ（ADR-019）
-  // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
+  // 記録中は webview の URL を変えない（Story 切替で巻き戻らないように）
   const previewUrl = !urlHistoryLoaded ? "" : isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
   useEffect(() => {

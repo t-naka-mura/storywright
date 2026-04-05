@@ -36,9 +36,9 @@ Storywright は React renderer だけでなく、Electron main process、WebCont
 
 ### Story playback
 
-- REC で新規 Story を録画し、その場で step が積み上がる
-- 録画完了後の Story をそのまま Run できる
-- 実録画した Story が再起動後に復元され、そのまま Run できる
+- REC で新規 Story を記録し、その場で step が積み上がる
+- 記録完了後の Story をそのまま Run できる
+- 実記録した Story が再起動後に復元され、そのまま Run できる
 - 保存済み Story を選択して Run できる
 - navigate / click / assert の最小フローが pass する
 - step status が renderer に反映される
@@ -58,7 +58,7 @@ Storywright は React renderer だけでなく、Electron main process、WebCont
 - `STORYWRIGHT_USER_DATA_DIR` で userData をテスト専用ディレクトリへ切り替える
 - seed データは `stories.json` / `urlHistory.json` / `environment.json` を直接書く
 - 外部サービス依存を避けるため、fixture site はテストプロセス内で HTTP server を立てる
-- native preview の録画テストは test-only IPC で active preview に script を流し込み、実アプリの recorder pipeline を通して検証する
+- native preview の記録テストは test-only IPC で active preview に script を流し込み、実アプリの recorder pipeline を通して検証する
 
 ## 実行方針
 

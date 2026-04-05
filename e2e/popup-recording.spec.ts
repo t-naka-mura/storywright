@@ -54,7 +54,7 @@ test("popup PayPal login can be recorded and replayed as a story", async () => {
     // activate-tab /checkout-popup, assert #payment-status
     await waitForRecordedStepCount(mainWindow, 8);
 
-    // 録画停止
+    // 記録停止
     await mainWindow.getByRole("button", { name: /Stop/ }).click();
     const stepCount = await mainWindow.locator(".step-item").count();
     expect(stepCount).toBeGreaterThanOrEqual(8);

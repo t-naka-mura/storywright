@@ -59,8 +59,8 @@ test("recorded stories survive relaunch and sensitive values stay out of stories
 
     try {
       const restoredWindow = secondSession.mainWindow;
-      await expect(restoredWindow.getByRole("button", { name: /録画/ })).toBeVisible();
-      await restoredWindow.getByRole("button", { name: /録画/ }).click();
+      await expect(restoredWindow.getByRole("button", { name: /記録/ })).toBeVisible();
+      await restoredWindow.getByRole("button", { name: /記録/ }).click();
       const restoredStepCount = await restoredWindow.locator(".step-item").count();
       expect(restoredStepCount).toBeGreaterThanOrEqual(8);
       await expect(restoredWindow.getByText("••••••")).toBeVisible();

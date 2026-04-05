@@ -9,7 +9,8 @@ type HelpSection =
   | "assertion"
   | "running"
   | "managing"
-  | "environment";
+  | "environment"
+  | "shortcuts";
 
 const sections: { id: HelpSection; label: string }[] = [
   { id: "getting-started", label: "はじめに" },
@@ -18,6 +19,7 @@ const sections: { id: HelpSection; label: string }[] = [
   { id: "running", label: "テストを実行する" },
   { id: "managing", label: "ストーリーを管理する" },
   { id: "environment", label: "環境変数を使う" },
+  { id: "shortcuts", label: "ブラウザ操作とショートカット" },
 ];
 
 export function HelpPanel() {
@@ -193,6 +195,14 @@ export function HelpPanel() {
               <p className="help-paragraph">
                 録画中にリンクが新しいタブや popup ウィンドウで開かれた場合も、自動的に新しいタブとして管理されます。タブの切り替えも記録されるので、popup 内での操作もテストに含まれます。
               </p>
+              <h3 className="help-subtitle">機密値（パスワードなど）</h3>
+              <p className="help-paragraph">
+                パスワードなどの入力フィールドは自動的に「機密値」として記録され、画面上では値が伏せ字（••••••）で表示されます。
+                機密値はエクスポート時にもファイルに含まれず、端末のセキュアストレージに保存されます。
+              </p>
+              <p className="help-paragraph">
+                ステップ編集画面で「機密値（パスワード等）」のチェックを手動で切り替えることもできます。
+              </p>
             </div>
 
             {/* アサーションを追加する */}
@@ -228,6 +238,11 @@ export function HelpPanel() {
               <p className="help-paragraph">
                 「実行回数」を 2 以上に設定して Run を押すと、テストを連続で繰り返します。結果のサマリー（例: 10/10 passed）が表示されます。
               </p>
+              <h3 className="help-subtitle">Base URL</h3>
+              <p className="help-paragraph">
+                ストーリーごとに「Base URL」を設定できます。テスト実行時、最初にこの URL にアクセスしてからステップが始まります。
+                空欄の場合はアドレスバーに表示中の URL が使われます。
+              </p>
               <h3 className="help-subtitle">セッション維持</h3>
               <p className="help-paragraph">
                 「セッションを維持」にチェックを入れると、テスト実行前に Cookie やログイン状態をクリアしません。
@@ -243,6 +258,14 @@ export function HelpPanel() {
             {/* ストーリーを管理する */}
             <div id="managing" className="help-section">
               <h2 className="help-section-title">ストーリーを管理する</h2>
+              <h3 className="help-subtitle">ストーリー一覧</h3>
+              <p className="help-paragraph">
+                右パネルに録画済みのストーリーが一覧表示されます。ストーリーをクリックすると選択でき、ステップの確認や編集ができます。
+              </p>
+              <ul className="help-list">
+                <li><strong>並び替え</strong> — 一覧右上のドロップダウンで「新しい順」「古い順」「名前順」に並び替えられます。</li>
+                <li><strong>削除</strong> — ストーリー名の右にある × ボタンでストーリーを削除できます。</li>
+              </ul>
               <h3 className="help-subtitle">タイトルの変更</h3>
               <p className="help-paragraph">
                 右パネル上部のストーリー名をクリックすると、タイトルを編集できます。
@@ -292,6 +315,42 @@ export function HelpPanel() {
               <p className="help-paragraph">
                 Settings の「Import .env」ボタンで、既存の .env ファイルを読み込むことができます。
               </p>
+            </div>
+
+            {/* ブラウザ操作とショートカット */}
+            <div id="shortcuts" className="help-section">
+              <h2 className="help-section-title">ブラウザ操作とショートカット</h2>
+              <h3 className="help-subtitle">ブラウザバー</h3>
+              <p className="help-paragraph">
+                プレビューエリア上部のブラウザバーで、通常のブラウザと同じようにページ操作ができます。
+              </p>
+              <ul className="help-list">
+                <li><strong>戻る / 進む</strong> — ページの履歴を移動します。</li>
+                <li><strong>リロード</strong> — 現在のページを再読み込みします。</li>
+                <li><strong>URL 入力</strong> — アドレスバーに URL を入力して Enter で移動します。過去に入力した URL は候補として表示されます。</li>
+              </ul>
+              <h3 className="help-subtitle">タブ</h3>
+              <p className="help-paragraph">
+                ブラウザバーの上にタブが表示されます。「+」ボタンで新しいタブを追加、タブ右の × ボタンでタブを閉じることができます。
+              </p>
+              <h3 className="help-subtitle">ページ内検索</h3>
+              <p className="help-paragraph">
+                プレビューやヘルプ画面で Cmd+F（Windows: Ctrl+F）を押すと、ページ内のテキストを検索できます。
+                Enter で次の一致へ、Shift+Enter で前の一致へ移動します。Escape で検索バーを閉じます。
+              </p>
+              <h3 className="help-subtitle">キーボードショートカット</h3>
+              <table className="help-table">
+                <thead>
+                  <tr><th>ショートカット</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Cmd+,</td><td>Settings を開く</td></tr>
+                  <tr><td>Cmd+1</td><td>メインウィンドウを表示</td></tr>
+                  <tr><td>Cmd+2</td><td>Settings を開く</td></tr>
+                  <tr><td>Cmd+3</td><td>Help を開く</td></tr>
+                  <tr><td>Cmd+F</td><td>ページ内検索</td></tr>
+                </tbody>
+              </table>
             </div>
         </div>
       </div>

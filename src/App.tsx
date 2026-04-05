@@ -3,6 +3,7 @@ import { Toolbar } from "./components/Toolbar";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { HelpPanel } from "./components/HelpPanel";
 import { StatusBar } from "./components/StatusBar";
 import { ErrorDialog } from "./components/ErrorDialog";
 import type { EnvironmentSettings, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
@@ -27,6 +28,7 @@ import "./App.css";
 
 const defaultStories: Record<string, Story> = {};
 const isSettingsWindow = window.location.hash === "#/settings";
+const isHelpWindow = window.location.hash === "#/help";
 
 type AppErrorState = {
   title: string;
@@ -167,6 +169,10 @@ function App() {
 
   const handleOpenSettingsWindow = useCallback(() => {
     window.storywright.openSettingsWindow().catch(() => {});
+  }, []);
+
+  const handleOpenHelpWindow = useCallback(() => {
+    window.storywright.openHelpWindow().catch(() => {});
   }, []);
 
   const handleCloseCurrentWindow = useCallback(() => {
@@ -555,8 +561,41 @@ function App() {
   const previewUrl = !urlHistoryLoaded ? "" : isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
   useEffect(() => {
-    document.title = isSettingsWindow ? "Settings" : "Storywright";
+    document.title = isSettingsWindow ? "Settings" : isHelpWindow ? "Help" : "Storywright";
   }, []);
+
+  if (isHelpWindow) {
+    return (
+      <div className="settings-window-layout">
+        <div className="settings-window-titlebar">
+          <div className="settings-window-title">Help</div>
+          <div className="settings-window-titlebar-actions">
+            <button
+              type="button"
+              className="settings-window-chrome-button"
+              aria-label="Expand help window"
+              title="Expand help window"
+              onClick={handleToggleCurrentWindowZoom}
+            >
+              <span className="settings-window-chrome-icon settings-window-chrome-icon-expand" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="settings-window-chrome-button settings-window-chrome-button-close"
+              aria-label="Close help window"
+              title="Close help window"
+              onClick={handleCloseCurrentWindow}
+            >
+              <span className="settings-window-chrome-icon settings-window-chrome-icon-close" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div className="settings-window-body">
+          <HelpPanel />
+        </div>
+      </div>
+    );
+  }
 
   if (isSettingsWindow) {
     return (
@@ -611,6 +650,7 @@ function App() {
         onToggleAssertMode={handleToggleAssertMode}
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
         canExportStories={Object.keys(stories).length > 0}
+        onOpenHelp={handleOpenHelpWindow}
       />
       <div className="main-area">
         <>

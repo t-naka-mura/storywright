@@ -1237,6 +1237,7 @@ body,
 
 .preview-empty-icon {
   font-size: 40px;
+  color: var(--color-text-secondary);
 }
 
 .preview-empty-text {
@@ -2170,4 +2171,133 @@ li:hover + li .step-insert-zone .btn-insert {
   justify-content: flex-end;
   padding: 12px 20px;
   border-top: 1px solid var(--color-border);
+}
+
+/* === Help Panel === */
+
+.settings-window-body:has(.help-panel) {
+  overflow: hidden;
+}
+
+.help-panel {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0) 180px),
+    #f6f3ee;
+}
+
+.help-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  height: 100%;
+  gap: 32px;
+  padding: 36px 0 0 32px;
+}
+
+.help-nav {
+  position: sticky;
+  top: 0;
+  padding-top: 4px;
+  align-self: start;
+}
+
+.help-content {
+  overflow-y: auto;
+  padding-bottom: 40px;
+  padding-right: 32px;
+  scroll-behavior: smooth;
+}
+
+.help-section {
+  padding-top: 8px;
+  padding-bottom: 32px;
+}
+
+.help-section:last-child {
+  min-height: 60vh;
+}
+
+.help-section-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(217, 213, 208, 0.95);
+}
+
+.help-subtitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 24px 0 10px;
+}
+
+.help-paragraph {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+  margin: 0 0 12px;
+}
+
+.help-steps {
+  display: grid;
+  gap: 10px;
+  padding-left: 22px;
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.help-list {
+  display: grid;
+  gap: 8px;
+  padding-left: 22px;
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.help-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+  font-size: 13px;
+}
+
+.help-table th {
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(217, 213, 208, 0.95);
+  color: var(--color-text-secondary);
+}
+
+.help-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(217, 213, 208, 0.5);
+  color: var(--color-text);
+}
+
+.help-code {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(217, 213, 208, 0.8);
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 13px;
+  color: var(--color-text);
+  margin: 0 0 12px;
+}
+
+.help-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 2px;
 }

@@ -12,6 +12,7 @@ interface ToolbarProps {
   onToggleAssertMode: () => void;
   canRecord: boolean;
   canExportStories: boolean;
+  onOpenHelp: () => void;
 }
 
 export function Toolbar({
@@ -26,6 +27,7 @@ export function Toolbar({
   onToggleAssertMode,
   canRecord,
   canExportStories,
+  onOpenHelp,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -69,6 +71,13 @@ export function Toolbar({
               <RecordIcon /> REC
             </button>
           )}
+        <button className="btn btn-help" type="button" onClick={onOpenHelp} title="ヘルプ">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M6.5 7a2.5 2.5 0 0 1 4.85.83c0 1.25-1.6 1.67-1.85 2.67" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <circle cx="9" cy="13.5" r="0.75" fill="currentColor" />
+          </svg>
+        </button>
         <button className="btn btn-panel-toggle" type="button" onClick={onTogglePanel} title={isPanelOpen ? "パネルを閉じる" : "パネルを開く"}>
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="1.5" y="2" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />

@@ -183,6 +183,7 @@ function getResolvedEnvironmentForUrlOrThrow(url: string): NodeJS.ProcessEnv {
 
 let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let helpWindow: BrowserWindow | null = null;
 let isRecording = false;
 let recordingWebContentsIds: number[] = [];
 let lastRecordingWebContentsId: number | null = null;
@@ -273,12 +274,57 @@ function openSettingsWindow() {
   });
 }
 
+function openHelpWindow() {
+  if (helpWindow && !helpWindow.isDestroyed()) {
+    if (helpWindow.isMinimized()) {
+      helpWindow.restore();
+    }
+    helpWindow.focus();
+    return;
+  }
+
+  helpWindow = new BrowserWindow({
+    width: 820,
+    height: 700,
+    minWidth: 640,
+    minHeight: 480,
+    title: "Help",
+    titleBarStyle: "hidden",
+    parent: mainWindow ?? undefined,
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: true,
+    },
+  });
+
+  loadWindowContents(helpWindow, "#/help");
+  if (process.platform === "darwin") {
+    helpWindow.setWindowButtonVisibility(false);
+  }
+  helpWindow.webContents.on("page-title-updated", (event: Electron.Event) => {
+    event.preventDefault();
+    helpWindow?.setTitle("Help");
+  });
+  helpWindow.webContents.once("did-finish-load", () => {
+    helpWindow?.setTitle("Help");
+  });
+  helpWindow.on("closed", () => {
+    helpWindow = null;
+  });
+}
+
 function buildApplicationMenu() {
   const isMac = process.platform === "darwin";
   const settingsItem = {
-    label: "Settings...",
+    label: "Settings",
     accelerator: "CmdOrCtrl+,",
     click: () => openSettingsWindow(),
+  };
+  const helpItem = {
+    label: "Help",
+    click: () => openHelpWindow(),
   };
 
   const template = [
@@ -289,6 +335,7 @@ function buildApplicationMenu() {
             { role: "about" },
             { type: "separator" },
             settingsItem,
+            helpItem,
             { type: "separator" },
             { role: "services" },
             { type: "separator" },
@@ -303,7 +350,7 @@ function buildApplicationMenu() {
     {
       label: "File",
       submenu: [
-        ...(!isMac ? [settingsItem] : []),
+        ...(!isMac ? [settingsItem, helpItem] : []),
         { type: "separator" },
         { role: "quit" },
       ],
@@ -327,6 +374,7 @@ function buildApplicationMenu() {
       submenu: [
         { label: "Main Window", accelerator: "CmdOrCtrl+1", click: () => focusMainWindow() },
         { label: "Settings", accelerator: "CmdOrCtrl+2", click: () => openSettingsWindow() },
+        { label: "Help", accelerator: "CmdOrCtrl+3", click: () => openHelpWindow() },
         { type: "separator" },
         { role: "reload" },
         { role: "forceReload" },
@@ -705,6 +753,9 @@ function createMainWindow() {
     destroyPreviewTabs();
     if (settingsWindow && !settingsWindow.isDestroyed()) {
       settingsWindow.close();
+    }
+    if (helpWindow && !helpWindow.isDestroyed()) {
+      helpWindow.close();
     }
     mainWindow = null;
   });
@@ -1132,6 +1183,10 @@ function teardownRecorder() {
 function registerIpcHandlers() {
   ipcMain.handle("app:open-settings", async () => {
     openSettingsWindow();
+  });
+
+  ipcMain.handle("app:open-help", async () => {
+    openHelpWindow();
   });
 
   ipcMain.handle("app:close-current-window", async (event) => {

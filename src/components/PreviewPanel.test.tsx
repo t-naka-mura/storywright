@@ -48,6 +48,7 @@ describe("PreviewPanel", () => {
       getEnvironmentVariablePresence: vi.fn(async () => ({})),
       getEnvironmentSourceStatus: vi.fn(async () => ({ mode: "process-env" as const, loadedVariableCount: 0, inlineValueCount: 0 })),
       openSettingsWindow: vi.fn(async () => {}),
+      openHelpWindow: vi.fn(async () => {}),
       closeCurrentWindow: vi.fn(async () => {}),
         toggleCurrentWindowZoom: vi.fn(async () => {}),
       importEnvironmentFile: vi.fn(async () => null),

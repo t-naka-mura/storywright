@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld("storywright", {
     ipcRenderer.invoke("environment:get-source-status"),
   openSettingsWindow: () =>
     ipcRenderer.invoke("app:open-settings"),
+  openHelpWindow: () =>
+    ipcRenderer.invoke("app:open-help"),
   closeCurrentWindow: () =>
     ipcRenderer.invoke("app:close-current-window"),
   toggleCurrentWindowZoom: () =>

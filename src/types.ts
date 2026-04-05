@@ -139,6 +139,7 @@ export interface StorywrightAPI {
   getEnvironmentVariablePresence: (names: string[], url?: string) => Promise<EnvironmentPresenceMap>;
   getEnvironmentSourceStatus: () => Promise<EnvironmentSourceStatus>;
   openSettingsWindow: () => Promise<void>;
+  openHelpWindow: () => Promise<void>;
   closeCurrentWindow: () => Promise<void>;
   toggleCurrentWindowZoom: () => Promise<void>;
   importEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;

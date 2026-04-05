@@ -75,6 +75,22 @@ contextBridge.exposeInMainWorld("storywright", {
   previewReload: () => ipcRenderer.invoke("preview:reload"),
   previewFindInPage: (text: string, forward: boolean) => ipcRenderer.invoke("preview:find-in-page", text, forward),
   previewStopFindInPage: () => ipcRenderer.invoke("preview:stop-find-in-page"),
+  triggerExportStories: () => ipcRenderer.invoke("stories:trigger-export"),
+  triggerImportStories: () => ipcRenderer.invoke("stories:trigger-import"),
+  onRequestExport: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("stories:request-export", listener);
+    return () => {
+      ipcRenderer.removeListener("stories:request-export", listener);
+    };
+  },
+  onRequestImport: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("stories:request-import", listener);
+    return () => {
+      ipcRenderer.removeListener("stories:request-import", listener);
+    };
+  },
   showErrorDialog: (title: string, message: string) => ipcRenderer.invoke("dialog:show-error", title, message),
   onPreviewState: (callback: (state: unknown) => void) => {
     const listener = (_event: unknown, state: unknown) => callback(state);

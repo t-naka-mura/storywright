@@ -482,6 +482,20 @@ function App() {
     };
   }, []);
 
+  // Settings ウィンドウからの Export/Import リクエストを受け取る
+  useEffect(() => {
+    const unsubExport = window.storywright.onRequestExport(() => {
+      handleExportAllStories();
+    });
+    const unsubImport = window.storywright.onRequestImport(() => {
+      handleImportStories();
+    });
+    return () => {
+      unsubExport();
+      unsubImport();
+    };
+  }, [handleExportAllStories, handleImportStories]);
+
   const standaloneStories = Object.values(stories).filter(
     (s) => s.steps.length > 0,
   );
@@ -612,6 +626,8 @@ function App() {
             environmentSettingsError={environmentSettingsError}
             onSaveEnvironmentSettings={handleSaveEnvironmentSettings}
             onImportEnvironmentFile={handleImportEnvironmentFile}
+            onTriggerExportStories={() => window.storywright.triggerExportStories()}
+            onTriggerImportStories={() => window.storywright.triggerImportStories()}
           />
         </div>
       </div>
@@ -625,14 +641,12 @@ function App() {
         isPanelOpen={isPanelOpen}
         isRecording={isRecording}
         isAssertMode={isAssertMode}
-        onImportStories={handleImportStories}
-        onExportAllStories={handleExportAllStories}
         onStartRecording={handleStartRecording}
         onStopRecording={handleStopRecording}
         onToggleAssertMode={handleToggleAssertMode}
         canRecord={/^https?:\/\//.test(previewUrl) && !isRunning}
-        canExportStories={Object.keys(stories).length > 0}
         onOpenHelp={handleOpenHelpWindow}
+        onOpenSettings={handleOpenSettingsWindow}
       />
       <div className="main-area">
         <>

@@ -5,14 +5,12 @@ interface ToolbarProps {
   isPanelOpen: boolean;
   isRecording: boolean;
   isAssertMode: boolean;
-  onImportStories: () => void;
-  onExportAllStories: () => void;
   onStartRecording: () => void;
   onStopRecording: () => void;
   onToggleAssertMode: () => void;
   canRecord: boolean;
-  canExportStories: boolean;
   onOpenHelp: () => void;
+  onOpenSettings: () => void;
 }
 
 export function Toolbar({
@@ -20,14 +18,12 @@ export function Toolbar({
   isPanelOpen,
   isRecording,
   isAssertMode,
-  onImportStories,
-  onExportAllStories,
   onStartRecording,
   onStopRecording,
   onToggleAssertMode,
   canRecord,
-  canExportStories,
   onOpenHelp,
+  onOpenSettings,
 }: ToolbarProps) {
   return (
     <header className="toolbar">
@@ -36,12 +32,6 @@ export function Toolbar({
         <span className="toolbar-title">Storywright</span>
       </div>
       <div className="toolbar-right">
-        <button className="btn" type="button" onClick={onImportStories}>
-          Import
-        </button>
-        <button className="btn" type="button" onClick={onExportAllStories} disabled={!canExportStories}>
-          Export All
-        </button>
         {isRecording ? (
             <>
               <button
@@ -71,6 +61,12 @@ export function Toolbar({
               <RecordIcon /> REC
             </button>
           )}
+        <button className="btn btn-help" type="button" onClick={onOpenSettings} title="設定">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M7.5 2.25h3l.4 1.6a5.5 5.5 0 0 1 1.3.75l1.55-.5 1.5 2.6-1.15 1.1a5.5 5.5 0 0 1 0 1.5l1.15 1.1-1.5 2.6-1.55-.5a5.5 5.5 0 0 1-1.3.75l-.4 1.6h-3l-.4-1.6a5.5 5.5 0 0 1-1.3-.75l-1.55.5-1.5-2.6 1.15-1.1a5.5 5.5 0 0 1 0-1.5l-1.15-1.1 1.5-2.6 1.55.5a5.5 5.5 0 0 1 1.3-.75l.4-1.6Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        </button>
         <button className="btn btn-help" type="button" onClick={onOpenHelp} title="ヘルプ">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.5" />

@@ -47,6 +47,8 @@ function renderSettingsPanel(initialSettings: EnvironmentSettings = createEnviro
           setSettings(nextSettings);
         }}
         onImportEnvironmentFile={onImportEnvironmentFile}
+        onTriggerExportStories={vi.fn()}
+        onTriggerImportStories={vi.fn()}
       />
     );
   }

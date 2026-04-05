@@ -6,6 +6,10 @@
 
 ブラウザ操作を記録して、そのまま E2E テストとして実行できる Electron デスクトップアプリ。
 
+<p align="center">
+  <img src="docs/images/screenshot.png" alt="Storywright screenshot" width="800" />
+</p>
+
 ## ダウンロード
 
 [最新版をダウンロード（macOS）](https://github.com/t-naka-mura/storywright/releases/latest)

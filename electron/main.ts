@@ -1189,6 +1189,18 @@ function registerIpcHandlers() {
     openHelpWindow();
   });
 
+  ipcMain.handle("stories:trigger-export", async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("stories:request-export");
+    }
+  });
+
+  ipcMain.handle("stories:trigger-import", async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("stories:request-import");
+    }
+  });
+
   ipcMain.handle("app:close-current-window", async (event) => {
     const targetWindow = BrowserWindow.fromWebContents(event.sender);
     if (!targetWindow || targetWindow.isDestroyed()) {

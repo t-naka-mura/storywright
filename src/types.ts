@@ -165,6 +165,10 @@ export interface StorywrightAPI {
   previewReload: () => Promise<void>;
   previewFindInPage: (text: string, forward: boolean) => Promise<void>;
   previewStopFindInPage: () => Promise<void>;
+  triggerExportStories: () => Promise<void>;
+  triggerImportStories: () => Promise<void>;
+  onRequestExport: (callback: () => void) => () => void;
+  onRequestImport: (callback: () => void) => () => void;
   showErrorDialog: (title: string, message: string) => Promise<void>;
   onPreviewState: (callback: (state: PreviewState) => void) => () => void;
   onNewTab: (callback: (url: string) => void) => () => void;

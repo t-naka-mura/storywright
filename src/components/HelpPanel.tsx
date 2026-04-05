@@ -283,8 +283,8 @@ export function HelpPanel() {
                 ストーリーを JSON ファイルとして書き出し（Export）、別の環境で読み込む（Import）ことができます。
               </p>
               <ul className="help-list">
-                <li><strong>Export</strong> — ツールバーの「Export All」で全ストーリーを、右パネルの「Export」で個別のストーリーを書き出します。</li>
-                <li><strong>Import</strong> — ツールバーの「Import」で JSON ファイルを読み込みます。同じストーリーがある場合はコピーとして追加されます。</li>
+                <li><strong>Export</strong> — Settings の「Story Data」セクションにある「Export All」で全ストーリーを、右パネルの「Export」で個別のストーリーを書き出します。</li>
+                <li><strong>Import</strong> — Settings の「Story Data」セクションにある「Import」で JSON ファイルを読み込みます。同じストーリーがある場合はコピーとして追加されます。</li>
               </ul>
             </div>
 

@@ -93,12 +93,16 @@ function createNextEnvironmentLabel(domains: EnvironmentDomain[]) {
   return `LOCAL_ENV_${index}`;
 }
 
+type SettingsSection = "environment" | "story-data";
+
 interface SettingsPanelProps {
   requirements: EnvironmentRequirement[];
   environmentSettings: EnvironmentSettings;
   environmentSettingsError: string | null;
   onSaveEnvironmentSettings: (settings: EnvironmentSettings) => Promise<void>;
   onImportEnvironmentFile: () => Promise<ImportedEnvironmentValues | null>;
+  onTriggerExportStories: () => void;
+  onTriggerImportStories: () => void;
 }
 
 export function SettingsPanel({
@@ -106,7 +110,10 @@ export function SettingsPanel({
   environmentSettingsError,
   onSaveEnvironmentSettings,
   onImportEnvironmentFile,
+  onTriggerExportStories,
+  onTriggerImportStories,
 }: SettingsPanelProps) {
+  const [activeSection, setActiveSection] = useState<SettingsSection>("environment");
   const domains = getEnvironmentDomains(environmentSettings);
   const canAddEnvironment = domains.length < 10;
   const configuredValueCount = domains.reduce((count, domain) => count + (domain.values?.length ?? 0), 0);
@@ -242,14 +249,50 @@ export function SettingsPanel({
               <h1 className="settings-panel-title">Settings</h1>
             </div>
             <nav className="settings-nav-list">
-              <button type="button" className="settings-nav-item settings-nav-item-active" aria-current="page">
+              <button
+                type="button"
+                className={`settings-nav-item ${activeSection === "environment" ? "settings-nav-item-active" : ""}`}
+                aria-current={activeSection === "environment" ? "page" : undefined}
+                onClick={() => setActiveSection("environment")}
+              >
                 <span>Environment Variables</span>
                 <span className="settings-nav-count">{configuredValueCount}</span>
+              </button>
+              <button
+                type="button"
+                className={`settings-nav-item ${activeSection === "story-data" ? "settings-nav-item-active" : ""}`}
+                aria-current={activeSection === "story-data" ? "page" : undefined}
+                onClick={() => setActiveSection("story-data")}
+              >
+                <span>Story Data</span>
               </button>
             </nav>
           </aside>
 
           <div className="settings-content">
+            {activeSection === "story-data" ? (
+              <>
+                <div className="settings-panel-header">
+                  <div>
+                    <h2 className="settings-section-title">Story Data</h2>
+                  </div>
+                </div>
+                <div className="settings-story-data-section">
+                  <p className="settings-section-description">
+                    Story データのインポート・エクスポートができます。
+                  </p>
+                  <div className="settings-story-data-actions">
+                    <button className="btn" type="button" onClick={onTriggerImportStories}>
+                      Import
+                    </button>
+                    <button className="btn" type="button" onClick={onTriggerExportStories}>
+                      Export All
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+            <>
             <div className="settings-panel-header">
               <div>
                 <h2 className="settings-section-title">Environment Variables</h2>
@@ -438,6 +481,8 @@ export function SettingsPanel({
               )}
               </div>
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>

@@ -105,9 +105,10 @@ test("stories with different baseUrls resolve environment variables from matchin
 });
 
 /**
- * ホスト名が一致しない場合、環境変数不足エラーが表示されることを検証。
+ * ホスト名が一致しない場合でもプレースホルダーを使っていれば、
+ * 環境変数不足エラーが表示されることを検証。
  */
-test("story fails with missing env error when no domain matches the baseUrl hostname", async () => {
+test("story with env placeholders shows missing env error when no domain matches", async () => {
   const fixtureSite = await startFixtureSite();
 
   const session = await launchStorywright({
@@ -152,9 +153,69 @@ test("story fails with missing env error when no domain matches the baseUrl host
     await mainWindow.getByRole("button", { name: /No Match Story/ }).click();
     await mainWindow.getByRole("button", { name: /Run/ }).click();
 
-    // ホスト名マッチ失敗のエラーダイアログが表示される
-    await expect(mainWindow.locator(".dialog-title")).toHaveText("一致する環境設定がありません");
-    await expect(mainWindow.locator(".dialog-message")).toContainText("127.0.0.1");
+    // 環境変数不足エラーが表示される（renderer 側の事前チェック）
+    await expect(mainWindow.locator(".dialog-title")).toHaveText("環境変数が不足しています");
+    await expect(mainWindow.locator(".dialog-message")).toContainText("LOCAL_ENV.TOKEN");
+  } finally {
+    await session.close();
+    await fixtureSite.close();
+  }
+});
+
+/**
+ * プレースホルダーを使っていない Story は、ホスト名が一致しなくても正常に実行できることを検証。
+ */
+test("story without env placeholders runs successfully even when domain does not match", async () => {
+  const fixtureSite = await startFixtureSite();
+
+  const session = await launchStorywright({
+    urlHistory: {
+      lastBaseUrl: fixtureSite.origin,
+      history: [fixtureSite.origin],
+    },
+    stories: {
+      schemaVersion: 1,
+      stories: {
+        "story-plain": {
+          id: "story-plain",
+          title: "Plain Story",
+          baseUrl: fixtureSite.origin,
+          metadata: { createdAt: Date.now() },
+          steps: [
+            {
+              id: "s1", order: 1, action: "navigate",
+              target: `${fixtureSite.origin}/`,
+              value: "", description: "",
+            },
+            {
+              id: "s2", order: 2, action: "assert",
+              target: "h1",
+              value: "Test App",
+              description: "",
+            },
+          ],
+        },
+      },
+    },
+    // ドメインは "example.com" のみ → fixtureSite にはマッチしないが、プレースホルダーなしなので問題ない
+    environment: {
+      domains: [
+        {
+          id: "domain-other",
+          name: "Other Domain",
+          matchHost: "example.com",
+          values: [{ key: "TOKEN", value: "some-token" }],
+        },
+      ],
+      activeDomainId: "domain-other",
+    },
+  });
+
+  try {
+    const { mainWindow } = session;
+    await mainWindow.getByRole("button", { name: /Plain Story/ }).click();
+    await mainWindow.getByRole("button", { name: /Run/ }).click();
+    await expect(mainWindow.locator(".step-order-passed")).toHaveCount(2, { timeout: 15000 });
   } finally {
     await session.close();
     await fixtureSite.close();

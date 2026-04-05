@@ -174,8 +174,8 @@ function getResolvedEnvironmentForUrlOrThrow(url: string): NodeJS.ProcessEnv {
   const matchedDomain = getMatchingEnvironmentDomain(settings, url);
 
   if (hasConfiguredDomains && !matchedDomain) {
-    const hostname = new URL(url).hostname;
-    throw new Error(`No environment settings match hostname: ${hostname}`);
+    // hostname が一致しない場合はプロセス環境変数のみ返す（プレースホルダーがなければ影響なし）
+    return { ...process.env };
   }
 
   return resolveEnvironmentWithSettings(process.env, settings, url);
@@ -1435,6 +1435,35 @@ function registerIpcHandlers() {
       return JSON.parse(content);
     });
   }
+
+  ipcMain.handle("dialog:show-error", async (_event, title: string, message: string) => {
+    if (!mainWindow) return;
+    const errorWindow = new BrowserWindow({
+      width: 520,
+      height: 320,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      title,
+      titleBarStyle: "hidden",
+      parent: mainWindow,
+      alwaysOnTop: true,
+      show: true,
+      webPreferences: {
+        preload: path.join(__dirname, "preload.js"),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    const encodedTitle = encodeURIComponent(title);
+    const encodedMessage = encodeURIComponent(message);
+    loadWindowContents(errorWindow, `#/error?title=${encodedTitle}&message=${encodedMessage}`);
+
+    if (process.platform === "darwin") {
+      errorWindow.setWindowButtonVisibility(false);
+    }
+  });
 
   ipcMain.handle("start-recording", async () => {
     const allWc = getAllPreviewContents();

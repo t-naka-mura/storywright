@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld("storywright", {
   previewReload: () => ipcRenderer.invoke("preview:reload"),
   previewFindInPage: (text: string, forward: boolean) => ipcRenderer.invoke("preview:find-in-page", text, forward),
   previewStopFindInPage: () => ipcRenderer.invoke("preview:stop-find-in-page"),
+  showErrorDialog: (title: string, message: string) => ipcRenderer.invoke("dialog:show-error", title, message),
   onPreviewState: (callback: (state: unknown) => void) => {
     const listener = (_event: unknown, state: unknown) => callback(state);
     ipcRenderer.on("preview:state", listener);

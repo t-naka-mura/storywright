@@ -76,6 +76,7 @@ describe("PreviewPanel", () => {
       previewReload: vi.fn(async () => {}),
       previewFindInPage: vi.fn(async () => {}),
       previewStopFindInPage: vi.fn(async () => {}),
+      showErrorDialog: vi.fn(async () => {}),
       onPreviewState: vi.fn(() => vi.fn()),
       onNewTab: vi.fn(() => vi.fn()),
     };

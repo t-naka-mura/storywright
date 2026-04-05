@@ -2173,6 +2173,21 @@ li:hover + li .step-insert-zone .btn-insert {
   border-top: 1px solid var(--color-border);
 }
 
+/* エラーダイアログ（子ウィンドウ） */
+.dialog-standalone {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-bg-surface);
+  -webkit-app-region: drag;
+}
+
+.dialog-standalone .dialog-header,
+.dialog-standalone .dialog-body,
+.dialog-standalone .dialog-footer {
+  -webkit-app-region: no-drag;
+}
+
 /* === Help Panel === */
 
 .settings-window-body:has(.help-panel) {

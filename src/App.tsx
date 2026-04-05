@@ -5,12 +5,9 @@ import { DetailPanel } from "./components/DetailPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { HelpPanel } from "./components/HelpPanel";
 import { StatusBar } from "./components/StatusBar";
-import { ErrorDialog } from "./components/ErrorDialog";
 import type { EnvironmentSettings, Story, StoryResult, RepeatResult, RepeatProgress, RecordedStep } from "./types";
 import {
   collectEnvironmentRequirements,
-  createEnvironmentSetupGuide,
-  type EnvironmentSetupGuide,
   getMissingEnvironmentRequirementsForStory,
   type EnvironmentRequirement,
 } from "./lib/environmentRequirements";
@@ -29,14 +26,7 @@ import "./App.css";
 const defaultStories: Record<string, Story> = {};
 const isSettingsWindow = window.location.hash === "#/settings";
 const isHelpWindow = window.location.hash === "#/help";
-
-type AppErrorState = {
-  title: string;
-  message: string;
-  primaryActionLabel?: string;
-  onPrimaryAction?: () => void;
-  setupGuide?: EnvironmentSetupGuide;
-};
+const isErrorWindow = window.location.hash.startsWith("#/error");
 
 let storyIdCounter = 0;
 
@@ -70,7 +60,9 @@ function App() {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory, loaded: urlHistoryLoaded } = useUrlHistory();
-  const [error, setError] = useState<AppErrorState | null>(null);
+  const showError = useCallback((title: string, message: string) => {
+    window.storywright.showErrorDialog(title, message).catch(() => {});
+  }, []);
   const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({});
   const [environmentSettingsError, setEnvironmentSettingsError] = useState<string | null>(null);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
@@ -190,7 +182,6 @@ function App() {
     }
 
     try {
-      const setupGuide = createEnvironmentSetupGuide(stories);
       const filePath = await window.storywright.exportStoriesToFile(
         createExportStoryDocument(stories),
         "storywright-stories.storywright.json",
@@ -198,22 +189,14 @@ function App() {
       if (!filePath) {
         return;
       }
-      setError({
-        title: "Export 完了",
-        message: `${storyCount} stories を export しました。\n\n${filePath}`,
-        ...(setupGuide ? { setupGuide } : {}),
-      });
+      showError("Export 完了", `${storyCount} stories を export しました。\n\n${filePath}`);
     } catch (err) {
-      setError({
-        title: "Export エラー",
-        message: String(err),
-      });
+      showError("Export エラー", String(err));
     }
   }, [stories]);
 
   const handleExportStory = useCallback(async (story: Story) => {
     try {
-      const setupGuide = createEnvironmentSetupGuide({ [story.id]: story });
       const filePath = await window.storywright.exportStoriesToFile(
         createExportStoryDocument({ [story.id]: story }),
         toPortableFilename(story.title),
@@ -221,16 +204,9 @@ function App() {
       if (!filePath) {
         return;
       }
-      setError({
-        title: "Export 完了",
-        message: `${story.title} を export しました。\n\n${filePath}`,
-        ...(setupGuide ? { setupGuide } : {}),
-      });
+      showError("Export 完了", `${story.title} を export しました。\n\n${filePath}`);
     } catch (err) {
-      setError({
-        title: "Export エラー",
-        message: String(err),
-      });
+      showError("Export エラー", String(err));
     }
   }, []);
 
@@ -244,10 +220,7 @@ function App() {
       const importedStories = normalizeStoriesData(importedData);
       const result = mergeImportedStories(stories, importedStories);
       if (result.importedCount === 0) {
-        setError({
-          title: "Import エラー",
-          message: "Story が含まれていないため import できませんでした。",
-        });
+        showError("Import エラー", "Story が含まれていないため import できませんでした。");
         return;
       }
 
@@ -256,19 +229,13 @@ function App() {
         setSelectedStoryId(result.firstImportedStoryId);
       }
 
-      const setupGuide = createEnvironmentSetupGuide(importedStories);
-      setError({
-        title: "Import 完了",
-        message:
-          `${result.importedCount} stories を取り込みました。` +
+      showError(
+        "Import 完了",
+        `${result.importedCount} stories を取り込みました。` +
           (result.duplicatedCount > 0 ? `\n${result.duplicatedCount} stories は imported copy として追加しました。` : ""),
-        ...(setupGuide ? { setupGuide } : {}),
-      });
+      );
     } catch (err) {
-      setError({
-        title: "Import エラー",
-        message: String(err),
-      });
+      showError("Import エラー", String(err));
     }
   }, [stories]);
 
@@ -299,12 +266,10 @@ function App() {
       ) as Record<string, string | undefined>;
     } catch (err) {
       const message = String(err);
-      setError({
-        title: message.includes("match hostname") ? "一致する環境設定がありません" : "環境設定を読み込めませんでした",
+      showError(
+        message.includes("match hostname") ? "一致する環境設定がありません" : "環境設定を読み込めませんでした",
         message,
-        primaryActionLabel: "Settings を開く",
-        onPrimaryAction: handleOpenSettingsWindow,
-      });
+      );
       return false;
     }
 
@@ -315,12 +280,10 @@ function App() {
     }
 
     const missingNames = missingRequirements.map((requirement) => requirement.displayName).join("\n");
-    setError({
-      title: "環境変数が不足しています",
-      message: `この Story の実行に必要な環境変数が不足しています。\n\n${missingNames}\n\nSettings... を開いて不足項目を確認してください。`,
-      primaryActionLabel: "Settings を開く",
-      onPrimaryAction: handleOpenSettingsWindow,
-    });
+    showError(
+      "環境変数が不足しています",
+      `この Story の実行に必要な環境変数が不足しています。\n\n${missingNames}\n\nSettings... を開いて不足項目を確認してください。`,
+    );
     return false;
   }, [handleOpenSettingsWindow]);
 
@@ -368,10 +331,7 @@ function App() {
       setResults((prev) => ({ ...prev, [story.id]: result }));
     } catch (err) {
       const errorMsg = String(err);
-      setError({
-        title: "テスト実行エラー",
-        message: errorMsg,
-      });
+      showError("テスト実行エラー", errorMsg);
     } finally {
       // キャンセル後に新しい実行が始まっている場合は isRunning を触らない
       if (!runCancelledRef.current) {
@@ -411,7 +371,7 @@ function App() {
       );
       setRepeatResult(result);
     } catch (err) {
-      setError({ title: "繰り返し実行エラー", message: String(err) });
+      showError("繰り返し実行エラー", String(err));
     } finally {
       setIsRunning(false);
       setRepeatProgress(null);
@@ -485,7 +445,7 @@ function App() {
       await window.storywright.startRecording();
     } catch (err) {
       setIsRecording(false);
-      setError({ title: "記録開始エラー", message: String(err) });
+      showError("記録開始エラー", String(err));
     }
   }, [selectedStoryId, isPanelOpen]);
 
@@ -561,8 +521,30 @@ function App() {
   const previewUrl = !urlHistoryLoaded ? "" : isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
   useEffect(() => {
-    document.title = isSettingsWindow ? "Settings" : isHelpWindow ? "Help" : "Storywright";
+    document.title = isSettingsWindow ? "Settings" : isHelpWindow ? "Help" : isErrorWindow ? "Error" : "Storywright";
   }, []);
+
+  if (isErrorWindow) {
+    const params = new URLSearchParams(window.location.hash.replace("#/error?", ""));
+    const errorTitle = decodeURIComponent(params.get("title") || "エラー");
+    const errorMessage = decodeURIComponent(params.get("message") || "");
+    return (
+      <div className="dialog-standalone">
+        <div className="dialog-header">
+          <span className="dialog-icon">!</span>
+          <span className="dialog-title">{errorTitle}</span>
+        </div>
+        <div className="dialog-body">
+          <pre className="dialog-message">{errorMessage}</pre>
+        </div>
+        <div className="dialog-footer">
+          <button className="btn btn-primary" type="button" onClick={() => window.close()}>
+            閉じる
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isHelpWindow) {
     return (
@@ -689,16 +671,6 @@ function App() {
         </>
       </div>
       <StatusBar isRecording={isRecording} isAssertMode={isAssertMode} />
-      {error && (
-        <ErrorDialog
-          title={error.title}
-          message={error.message}
-          primaryActionLabel={error.primaryActionLabel}
-          onPrimaryAction={error.onPrimaryAction}
-          setupGuide={error.setupGuide}
-          onClose={() => setError(null)}
-        />
-      )}
     </div>
   );
 }

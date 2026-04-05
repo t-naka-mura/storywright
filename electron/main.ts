@@ -1493,12 +1493,21 @@ function registerIpcHandlers() {
         return { status: 'passed' };
       }
       case 'assert': {
-        var assertEl = await waitForElement(step.target, timeout);
-        var text = assertEl.textContent || '';
-        if (!text.includes(step.value)) {
-          throw new Error('Assertion failed: expected "' + step.value + '" in "' + text.trim() + '"');
+        var assertDeadline = Date.now() + timeout;
+        while (true) {
+          var assertEl = resolveSelector(step.target);
+          if (assertEl) {
+            var text = assertEl.textContent || '';
+            if (text.includes(step.value)) {
+              return { status: 'passed' };
+            }
+          }
+          if (Date.now() >= assertDeadline) {
+            var finalText = assertEl ? (assertEl.textContent || '') : '(element not found)';
+            throw new Error('Assertion failed: expected "' + step.value + '" in "' + finalText.trim() + '"');
+          }
+          await new Promise(function(r) { setTimeout(r, 100); });
         }
-        return { status: 'passed' };
       }
       case 'wait': {
         if (step.value === 'hidden') {

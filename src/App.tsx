@@ -67,7 +67,7 @@ function App() {
   const [results, setResults] = useState<Record<string, StoryResult>>({});
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
-  const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory } = useUrlHistory();
+  const { baseUrl, setBaseUrl, urlHistory, addUrlToHistory, deleteUrlFromHistory, loaded: urlHistoryLoaded } = useUrlHistory();
   const [error, setError] = useState<AppErrorState | null>(null);
   const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({});
   const [environmentSettingsError, setEnvironmentSettingsError] = useState<string | null>(null);
@@ -550,8 +550,9 @@ function App() {
     }
   }, [selectedStoryId]);
 
+  // URL 履歴ロード完了まで空にして、デフォルト値での初回タブ作成を防ぐ（ADR-019）
   // 録画中は webview の URL を変えない（Story 切替で巻き戻らないように）
-  const previewUrl = isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
+  const previewUrl = !urlHistoryLoaded ? "" : isRecording ? baseUrl : (selectedStory?.baseUrl || baseUrl);
 
   useEffect(() => {
     document.title = isSettingsWindow ? "Settings" : "Storywright";

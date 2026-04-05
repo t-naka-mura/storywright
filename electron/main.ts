@@ -1415,18 +1415,30 @@ function registerIpcHandlers() {
   }
 
   // DOM 安定待機: MutationObserver で変更を監視し、
-  // quietMs の間変更がなければ「安定した」と判断する
+  // quietMs の間変更がなければ「安定した」と判断する。
+  // さらに requestIdleCallback でメインスレッドのアイドルも確認する（ADR-022 Phase 2）
   function waitForDomSettle(timeoutMs, quietMs) {
     timeoutMs = timeoutMs || 3000;
     quietMs = quietMs || 150;
     return new Promise(function(resolve) {
+      var settled = false;
+
+      function onSettle() {
+        if (settled) return;
+        settled = true;
+        observer.disconnect();
+        // DOM 安定後、メインスレッド（React 等のレンダリング）がアイドルになるまで待つ
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(function() { resolve(); }, { timeout: 500 });
+        } else {
+          resolve();
+        }
+      }
+
       var timer = null;
       var observer = new MutationObserver(function() {
         if (timer) clearTimeout(timer);
-        timer = setTimeout(function() {
-          observer.disconnect();
-          resolve();
-        }, quietMs);
+        timer = setTimeout(onSettle, quietMs);
       });
       observer.observe(document.body, {
         childList: true,
@@ -1435,18 +1447,21 @@ function registerIpcHandlers() {
         characterData: true
       });
       // 初回タイマー: DOM 変更が一切なくても quietMs 後に解決
-      timer = setTimeout(function() {
-        observer.disconnect();
-        resolve();
-      }, quietMs);
+      timer = setTimeout(onSettle, quietMs);
       // 最大待機ガード
       setTimeout(function() {
-        if (timer) clearTimeout(timer);
-        observer.disconnect();
-        resolve();
+        if (!settled) {
+          settled = true;
+          if (timer) clearTimeout(timer);
+          observer.disconnect();
+          resolve();
+        }
       }, timeoutMs);
     });
   }
+
+  // ページ遷移後の DOM 安定待機に使えるよう公開（ADR-022 Phase 3）
+  window.__storywrightWaitForDomSettle = waitForDomSettle;
 
   window.__storywrightExecuteStep = async function(step) {
     var timeout = 10000;
@@ -1558,9 +1573,14 @@ function registerIpcHandlers() {
     try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
     await wc.debugger.sendCommand("Runtime.enable");
 
-    // 最初のステップが navigate ならそこでエンジン注入するのでスキップ
+    // 最初のステップが navigate でない場合、baseUrl へ遷移してからエンジン注入
     const firstStep = story.steps[0];
     if (!firstStep || firstStep.action !== "navigate") {
+      if (story.baseUrl) {
+        await wc.debugger.sendCommand("Page.enable");
+        await wc.debugger.sendCommand("Page.navigate", { url: story.baseUrl });
+        await waitForWebContentsReady(wc);
+      }
       await wc.debugger.sendCommand("Runtime.evaluate", {
         expression: EXECUTOR_INJECTION_SCRIPT,
         returnByValue: true,
@@ -1623,6 +1643,14 @@ function registerIpcHandlers() {
             expression: EXECUTOR_INJECTION_SCRIPT,
             returnByValue: true,
           });
+          // ページ遷移後に DOM が安定するまで待つ（ADR-022 Phase 3）
+          try {
+            await wc.debugger.sendCommand("Runtime.evaluate", {
+              expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
+              returnByValue: true,
+              awaitPromise: true,
+            });
+          } catch { /* context lost during settle — next step will handle */ }
         } else {
           // CDP Runtime.evaluate でステップ実行（executeJavaScript はページロード待ちで遅い）
           try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
@@ -1654,6 +1682,14 @@ function registerIpcHandlers() {
               expression: EXECUTOR_INJECTION_SCRIPT,
               returnByValue: true,
             });
+            // click によるナビゲーション復帰後に DOM 安定待機（ADR-022 Phase 3）
+            try {
+              await wc.debugger.sendCommand("Runtime.evaluate", {
+                expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
+                returnByValue: true,
+                awaitPromise: true,
+              });
+            } catch { /* ignore */ }
             currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
             evalResult = { result: { value: { status: "passed" } } };
           }
@@ -1669,6 +1705,14 @@ function registerIpcHandlers() {
                 expression: EXECUTOR_INJECTION_SCRIPT,
                 returnByValue: true,
               });
+              // exceptionDetails 経路の復帰後も DOM 安定待機（ADR-022 Phase 3）
+              try {
+                await wc.debugger.sendCommand("Runtime.evaluate", {
+                  expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
+                  returnByValue: true,
+                  awaitPromise: true,
+                });
+              } catch { /* ignore */ }
               currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
             } else {
               throw new Error(exceptionText);

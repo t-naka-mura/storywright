@@ -1388,6 +1388,18 @@ function registerIpcHandlers() {
     getActivePreviewContents()?.reload();
   });
 
+  ipcMain.handle("preview:find-in-page", async (_event, text: string, forward: boolean) => {
+    const wc = getActivePreviewContents();
+    if (!wc || !text) return;
+    wc.findInPage(text, { forward, findNext: true });
+  });
+
+  ipcMain.handle("preview:stop-find-in-page", async () => {
+    const wc = getActivePreviewContents();
+    if (!wc) return;
+    wc.stopFindInPage("clearSelection");
+  });
+
   if (TEST_API_ENABLED) {
     ipcMain.handle("test:get-preview-bounds", async () => ({ ...previewBounds }));
     ipcMain.handle("test:open-settings", async () => {

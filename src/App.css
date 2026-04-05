@@ -2301,3 +2301,41 @@ li:hover + li .step-insert-zone .btn-insert {
   vertical-align: middle;
   margin: 0 2px;
 }
+
+.help-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(217, 213, 208, 0.95);
+}
+
+.help-search-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid rgba(217, 213, 208, 0.95);
+  border-radius: 6px;
+  font-size: 13px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  outline: none;
+}
+
+.help-search-input:focus {
+  border-color: var(--color-accent);
+}
+
+.help-search-close {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.help-search-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

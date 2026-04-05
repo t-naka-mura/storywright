@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RecordIcon, StopIcon, CheckIcon, PlayIcon, HourglassIcon,
 } from "./Icons";
@@ -22,7 +22,10 @@ const sections: { id: HelpSection; label: string }[] = [
 
 export function HelpPanel() {
   const [activeSection, setActiveSection] = useState<HelpSection>("getting-started");
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const contentRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const isClickScrolling = useRef(false);
 
   // IntersectionObserver でスクロール位置に応じてナビをハイライト
@@ -51,6 +54,31 @@ export function HelpPanel() {
     return () => observer.disconnect();
   }, []);
 
+  // Cmd+F / Ctrl+F で検索バーを表示
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      }
+      if (e.key === "Escape" && showSearch) {
+        setShowSearch(false);
+        setSearchQuery("");
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showSearch]);
+
+  const handleSearch = useCallback((query: string, backwards = false) => {
+    if (!query) return;
+    window.getSelection()?.removeAllRanges();
+    // eslint-disable-next-line @deprecation/deprecation
+    (window as unknown as { find: (s: string, c: boolean, b: boolean, w: boolean) => boolean }).find(query, false, backwards, true);
+  }, []);
+
   const handleNavClick = (id: HelpSection) => {
     setActiveSection(id);
     const el = contentRef.current?.querySelector(`#${id}`);
@@ -62,6 +90,41 @@ export function HelpPanel() {
 
   return (
     <section className="help-panel" aria-label="Help">
+      {showSearch && (
+        <div className="help-search-bar">
+          <input
+            ref={searchInputRef}
+            className="help-search-input"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value) handleSearch(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleSearch(searchQuery, e.shiftKey);
+              }
+              if (e.key === "Escape") {
+                setShowSearch(false);
+                setSearchQuery("");
+                window.getSelection()?.removeAllRanges();
+              }
+            }}
+            placeholder="検索..."
+          />
+          <button
+            className="help-search-close"
+            type="button"
+            onClick={() => {
+              setShowSearch(false);
+              setSearchQuery("");
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
       <div className="help-layout">
         <aside className="help-nav" aria-label="Help sections">
           <div className="settings-nav-header">

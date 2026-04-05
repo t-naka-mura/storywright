@@ -163,6 +163,8 @@ export interface StorywrightAPI {
   previewGoBack: () => Promise<void>;
   previewGoForward: () => Promise<void>;
   previewReload: () => Promise<void>;
+  previewFindInPage: (text: string, forward: boolean) => Promise<void>;
+  previewStopFindInPage: () => Promise<void>;
   onPreviewState: (callback: (state: PreviewState) => void) => () => void;
   onNewTab: (callback: (url: string) => void) => () => void;
   testGetPreviewBounds?: () => Promise<PreviewBounds>;

@@ -74,6 +74,8 @@ describe("PreviewPanel", () => {
       previewGoBack: vi.fn(async () => {}),
       previewGoForward: vi.fn(async () => {}),
       previewReload: vi.fn(async () => {}),
+      previewFindInPage: vi.fn(async () => {}),
+      previewStopFindInPage: vi.fn(async () => {}),
       onPreviewState: vi.fn(() => vi.fn()),
       onNewTab: vi.fn(() => vi.fn()),
     };

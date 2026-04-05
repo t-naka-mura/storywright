@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld("storywright", {
   previewGoBack: () => ipcRenderer.invoke("preview:go-back"),
   previewGoForward: () => ipcRenderer.invoke("preview:go-forward"),
   previewReload: () => ipcRenderer.invoke("preview:reload"),
+  previewFindInPage: (text: string, forward: boolean) => ipcRenderer.invoke("preview:find-in-page", text, forward),
+  previewStopFindInPage: () => ipcRenderer.invoke("preview:stop-find-in-page"),
   onPreviewState: (callback: (state: unknown) => void) => {
     const listener = (_event: unknown, state: unknown) => callback(state);
     ipcRenderer.on("preview:state", listener);

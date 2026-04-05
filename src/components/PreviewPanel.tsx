@@ -32,8 +32,11 @@ export function PreviewPanel({
   const [barUrl, setBarUrl] = useState(url);
   const [isEditing, setIsEditing] = useState(false);
   const [showUrlDropdown, setShowUrlDropdown] = useState(false);
+  const [showFind, setShowFind] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
   const urlBarRef = useRef<HTMLDivElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const lastLoadedUrlRef = useRef<string>("");
   const lastAppliedExternalUrlRef = useRef<string | null>(null);
@@ -148,6 +151,38 @@ export function PreviewPanel({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [showUrlDropdown]);
+
+  // --- ページ内検索 ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        setShowFind(true);
+        setTimeout(() => findInputRef.current?.focus(), 0);
+      }
+      if (e.key === "Escape" && showFind) {
+        setShowFind(false);
+        setFindQuery("");
+        window.storywright.previewStopFindInPage().catch(() => {});
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [showFind]);
+
+  const handleFind = useCallback((text: string, forward = true) => {
+    if (!text) {
+      window.storywright.previewStopFindInPage().catch(() => {});
+      return;
+    }
+    window.storywright.previewFindInPage(text, forward).catch(() => {});
+  }, []);
+
+  const handleCloseFind = useCallback(() => {
+    setShowFind(false);
+    setFindQuery("");
+    window.storywright.previewStopFindInPage().catch(() => {});
+  }, []);
 
   // --- タブ操作 ---
   const handleAddTab = useCallback(() => {
@@ -362,6 +397,37 @@ export function PreviewPanel({
       {isRecording && (
         <div className="preview-recording-badge">
           <RecordIcon /> 録画中 — {recordedStepCount} ステップ記録済み
+        </div>
+      )}
+
+      {/* ページ内検索 */}
+      {showFind && (
+        <div className="help-search-bar">
+          <input
+            ref={findInputRef}
+            className="help-search-input"
+            value={findQuery}
+            onChange={(e) => {
+              setFindQuery(e.target.value);
+              handleFind(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleFind(findQuery, !e.shiftKey);
+              }
+              if (e.key === "Escape") {
+                handleCloseFind();
+              }
+            }}
+            placeholder="ページ内検索..."
+          />
+          <button
+            className="help-search-close"
+            type="button"
+            onClick={handleCloseFind}
+          >
+            ×
+          </button>
         </div>
       )}
 

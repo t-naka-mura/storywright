@@ -2,17 +2,56 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Check if release is needed
+        id: check
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if echo "$MSG" | head -1 | grep -qE '^(docs|chore|style|test|ci):'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping release for: $MSG"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-mac:
+    needs: check
+    if: needs.check.outputs.skip == 'false'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine next version
+        id: version
+        run: |
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LATEST" ]; then
+            NEXT="v0.1.0"
+          else
+            PATCH=$(echo "$LATEST" | sed 's/v[0-9]*\.[0-9]*\.//')
+            MAJOR_MINOR=$(echo "$LATEST" | sed 's/\.[0-9]*$//')
+            NEXT="${MAJOR_MINOR}.$((PATCH + 1))"
+          fi
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT"
+
+      - name: Create tag
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -34,6 +73,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
           files: |
             release/*.dmg
           draft: false

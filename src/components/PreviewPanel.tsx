@@ -94,7 +94,7 @@ export function PreviewPanel({
 
   useEffect(() => {
     if (!isInputActive()) {
-      setBarUrl(activeTab?.url || url);
+      setBarUrl(activeTab ? (activeTab.url || "") : url);
     }
   }, [activeTab?.id, activeTab?.url, url, isEditing]);
 
@@ -108,6 +108,7 @@ export function PreviewPanel({
     lastAppliedExternalUrlRef.current = null;
   }, [previewState.activeTabId]);
 
+  // 初回タブ作成のみ（url prop 変更時の自動ロードは行わない — ADR-019）
   useEffect(() => {
     if (!url || !/^https?:\/\//.test(url) || isInputActive()) return;
     if (!previewState.activeTabId) {
@@ -121,16 +122,8 @@ export function PreviewPanel({
         }
         lastAppliedExternalUrlRef.current = null;
       });
-      return;
     }
-    if (lastAppliedExternalUrlRef.current === url) return;
-    lastAppliedExternalUrlRef.current = url;
-    if (activeTab?.url !== url) {
-      window.storywright.loadPreviewUrl(url).catch(() => {
-        lastAppliedExternalUrlRef.current = null;
-      });
-    }
-  }, [url, isEditing, previewState.activeTabId, previewState.tabs.length, activeTab?.url]);
+  }, [url, isEditing, previewState.activeTabId, previewState.tabs.length]);
 
   useEffect(() => {
     if (!onUrlLoaded || !activeTab?.url || activeTab.loading) return;

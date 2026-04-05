@@ -524,6 +524,17 @@ function App() {
     setIsPanelOpen((prev) => !prev);
   }, []);
 
+  // Story 選択時に baseUrl がある場合はアクティブタブに明示的にロード（ADR-019）
+  const handleSelectStory = useCallback((storyId: string) => {
+    setSelectedStoryId(storyId);
+    if (isRecording) return;
+    const story = stories[storyId];
+    const storyUrl = story?.baseUrl;
+    if (storyUrl && /^https?:\/\//.test(storyUrl)) {
+      window.storywright.loadPreviewUrl(storyUrl).catch(() => {});
+    }
+  }, [stories, isRecording]);
+
   const handleDeselectStory = useCallback(() => {
     setSelectedStoryId(null);
   }, []);
@@ -628,7 +639,7 @@ function App() {
             repeatResult={repeatResult}
             standaloneStories={standaloneStories}
             storyResults={results}
-            onSelectStory={setSelectedStoryId}
+            onSelectStory={handleSelectStory}
             onDeselectStory={handleDeselectStory}
             onDeleteStory={handleDeleteStory}
             onOpenSettings={handleOpenSettingsWindow}

@@ -6,7 +6,7 @@
 
 - **フロントエンド**: React 19 + TypeScript + Vite
 - **バックエンド**: Electron (Node.js)
-- **E2Eテスト**: Preview webview 上で CDP + executeJavaScript により直接実行
+- **E2Eテスト**: Preview webview 上で CDP `Runtime.evaluate` により直接実行
 - **パッケージマネージャ**: pnpm
 
 ## 開発コマンド
@@ -22,6 +22,7 @@ pnpm build          # 本番ビルド
 ```
 src/           # React フロントエンド
 electron/      # Electron main process + preload
+e2e/           # E2E テスト（Playwright + Electron）
 docs/ai/       # 設計ドキュメント・仕様・ADR
   adr/         # Architecture Decision Records
   index.md     # docs/ai 運用ガイド

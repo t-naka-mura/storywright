@@ -38,8 +38,16 @@ pnpm build
 ```
 src/           # React フロントエンド
 electron/      # Electron main process + preload
+e2e/           # E2E テスト（Playwright + Electron）
 docs/ai/       # 設計ドキュメント・仕様・ADR
 public/        # 静的アセット
+```
+
+## テスト
+
+```bash
+pnpm vitest run          # ユニットテスト
+pnpm build && pnpm test:e2e   # E2E テスト（ビルド後に実行）
 ```
 
 ## 推奨エディタ

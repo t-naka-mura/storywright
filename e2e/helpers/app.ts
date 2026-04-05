@@ -417,6 +417,77 @@ export async function startFixtureSite(): Promise<FixtureServer> {
       return;
     }
 
+    if (requestUrl === "/checkout-popup") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>Checkout (Popup)</h1>
+              <p id="payment-status">未決済</p>
+              <button id="pay-with-paypal">PayPal で支払う</button>
+              <script>
+                // Cookie にログイン情報があれば popup をスキップして直接決済完了
+                function getCookie(name) {
+                  var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+                  return match ? decodeURIComponent(match[1]) : null;
+                }
+                var savedEmail = getCookie('paypal-email');
+                if (savedEmail) {
+                  document.getElementById('payment-status').textContent =
+                    'PayPal paid by ' + savedEmail;
+                }
+                document.getElementById('pay-with-paypal').addEventListener('click', () => {
+                  var email = getCookie('paypal-email');
+                  if (email) {
+                    document.getElementById('payment-status').textContent =
+                      'PayPal paid by ' + email;
+                    return;
+                  }
+                  window.open('/popup-paypal', 'paypal-login', 'width=400,height=400');
+                });
+                window.addEventListener('message', (event) => {
+                  if (!event.data || event.data.type !== 'paypal-login-success') return;
+                  document.cookie = 'paypal-email=' + encodeURIComponent(event.data.email) + '; path=/';
+                  document.getElementById('payment-status').textContent =
+                    'PayPal paid by ' + event.data.email;
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
+    if (requestUrl === "/popup-paypal") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html>
+        <html>
+          <body>
+            <main>
+              <h1>PayPal Login (Popup)</h1>
+              <label for="pp-email">Email</label>
+              <input id="pp-email" type="email" autocomplete="off" />
+              <label for="pp-password">Password</label>
+              <input id="pp-password" type="password" autocomplete="off" />
+              <button id="pp-submit">Log in & Pay</button>
+              <script>
+                document.getElementById('pp-submit').addEventListener('click', () => {
+                  const email = document.getElementById('pp-email').value;
+                  // Cookie に保存（タブ間で共有される）
+                  document.cookie = 'paypal-email=' + encodeURIComponent(email) + '; path=/';
+                  if (window.opener) {
+                    window.opener.postMessage({ type: 'paypal-login-success', email }, '*');
+                  }
+                  window.close();
+                });
+              </script>
+            </main>
+          </body>
+        </html>`);
+      return;
+    }
+
     if (requestUrl === "/login") {
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(`<!doctype html>

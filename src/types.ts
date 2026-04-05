@@ -1,7 +1,7 @@
 export interface Step {
   id: string;
   order: number;
-  action: "navigate" | "click" | "type" | "select" | "assert" | "wait" | "screenshot";
+  action: "navigate" | "click" | "type" | "select" | "assert" | "wait" | "screenshot" | "activate-tab";
   target: string;
   value: string;
   valueRef?: string;
@@ -92,7 +92,7 @@ export type RepeatProgress = {
 };
 
 export interface RecordedStep {
-  action: "navigate" | "click" | "type" | "select" | "assert";
+  action: "navigate" | "click" | "type" | "select" | "assert" | "activate-tab";
   target: string;
   value: string;
   timestamp: number;

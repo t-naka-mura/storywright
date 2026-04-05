@@ -185,6 +185,7 @@ let mainWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let isRecording = false;
 let recordingWebContentsIds: number[] = [];
+let lastRecordingWebContentsId: number | null = null;
 let previewTabIdCounter = 0;
 let activePreviewTabId: string | null = null;
 let previewBounds = { x: 0, y: 0, width: 0, height: 0 };
@@ -498,6 +499,8 @@ function closePreviewTab(tabId: string, closeContents = true) {
   if (activePreviewTabId === tabId) {
     const fallback = previewTabs[index] ?? previewTabs[index - 1] ?? null;
     activePreviewTabId = fallback?.id ?? null;
+    // activate-tab ステップは closePreviewTab からは送信しない。
+    // setupRecorderOnWebview の processRecorderMessage で自動挿入する。
   }
 
   if (previewTabs.length === 0) {
@@ -524,8 +527,8 @@ function setupNewWindowHandler(wc: Electron.WebContents) {
 
         if (details.url) {
           setTimeout(() => {
-            const popupContents = popupView.webContents;
-            if (popupContents.isDestroyed() || tab.isClosing) return;
+            const popupContents = popupView?.webContents;
+            if (!popupContents || popupContents.isDestroyed() || tab.isClosing) return;
             const currentUrl = popupContents.getURL();
             const shouldKickNavigation = !currentUrl || currentUrl === "about:blank";
             if (!shouldKickNavigation) return;
@@ -536,6 +539,23 @@ function setupNewWindowHandler(wc: Electron.WebContents) {
 
         if (isRecording) {
           setupRecorderOnWebview(tab.view.webContents);
+          // popup はこの時点で既にナビゲート済みの場合がある（Page.frameNavigated を見逃す）
+          // lastRecordingWebContentsId を使って retroactive に activate-tab を挿入
+          const popupWc = tab.view.webContents;
+          setTimeout(() => {
+            if (!isRecording || popupWc.isDestroyed()) return;
+            const popupUrl = popupWc.getURL();
+            if (popupUrl && popupUrl !== "about:blank" &&
+                lastRecordingWebContentsId !== null && lastRecordingWebContentsId !== popupWc.id) {
+              lastRecordingWebContentsId = popupWc.id;
+              mainWindow?.webContents.send("recorder:step", {
+                action: "activate-tab",
+                target: popupUrl,
+                value: "",
+                timestamp: Date.now(),
+              });
+            }
+          }, 50);
         }
 
         return popupView.webContents;
@@ -609,9 +629,14 @@ function registerPreviewTab(
   setupNewWindowHandler(wc);
   previewTabs.push(tab);
 
+  const previousTabId = activePreviewTabId;
   if (activate || !activePreviewTabId) {
     activePreviewTabId = tab.id;
   }
+
+  // activate-tab ステップは registerPreviewTab からは送信しない。
+  // 代わりに setupRecorderOnWebview の processRecorderMessage で
+  // ソース webContents の変化を検知して自動挿入する（ADR-023）。
 
   updatePreviewTabState(tab);
   for (const delay of [0, 100, 500, 1500]) {
@@ -725,7 +750,11 @@ interface StepResult {
  */
 const RECORDER_INJECTION_SCRIPT = `
 (function() {
-  if (window.__storywrightRecorder) return;
+  // document ベースでガード: 同一オリジンの遷移（about:blank → 本来の URL）では
+  // window は使い回されるが document は新しくなるため、window でガードすると
+  // 遷移後の新しい document にリスナーが追加されない
+  if (document.__storywrightRecorder) return;
+  document.__storywrightRecorder = true;
   window.__storywrightRecorder = true;
   window.__storywrightAssertMode = false;
 
@@ -813,7 +842,11 @@ const RECORDER_INJECTION_SCRIPT = `
   }
 
   function sendStep(data) {
-    console.debug('__storywright_step__' + JSON.stringify(data));
+    if (typeof window.__storywrightSendMessage === 'function') {
+      window.__storywrightSendMessage('__storywright_step__' + JSON.stringify(data));
+    } else {
+      console.debug('__storywright_step__' + JSON.stringify(data));
+    }
   }
 
   // === アサートモード ===
@@ -866,7 +899,11 @@ const RECORDER_INJECTION_SCRIPT = `
     // アサートモード解除
     clearHighlight();
     window.__storywrightAssertMode = false;
-    console.debug('__storywright_assert_done__');
+    if (typeof window.__storywrightSendMessage === 'function') {
+      window.__storywrightSendMessage('__storywright_assert_done__');
+    } else {
+      console.debug('__storywright_assert_done__');
+    }
   }
 
   document.addEventListener('mouseover', handleAssertMouseover, true);
@@ -971,6 +1008,11 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
 
   // Page ドメインを有効化し、ページ遷移後もスクリプトを自動再注入
   wc.debugger.sendCommand("Page.enable").catch(() => {});
+  // Runtime.addBinding: recorder → main process の直接メッセージチャネル
+  // console.debug と違い popup でも確実に届く
+  wc.debugger.sendCommand("Runtime.addBinding", {
+    name: "__storywrightSendMessage",
+  }).catch(() => {});
   wc.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument", {
     source: RECORDER_INJECTION_SCRIPT,
   }).catch(() => {});
@@ -978,34 +1020,40 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
   // 現在のページにも注入
   wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
 
-  // ドメイン跨ぎナビゲーション時にスクリプト再注入 + Page ドメイン再有効化
+  // ドメイン跨ぎナビゲーション時にスクリプト再注入 + CDP ドメイン再有効化
   wc.on("did-navigate", () => {
     if (!isRecording) return;
     wc.debugger.sendCommand("Page.enable").catch(() => {});
+    wc.debugger.sendCommand("Runtime.enable").catch(() => {});
+    wc.debugger.sendCommand("Runtime.addBinding", {
+      name: "__storywrightSendMessage",
+    }).catch(() => {});
     wc.executeJavaScript(RECORDER_INJECTION_SCRIPT).catch(() => {});
   });
 
-  // navigate キャプチャ (CDP の Page.frameNavigated)
-  wc.debugger.on("message", (_event, method, params) => {
-    if (!isRecording) return;
-    if (method === "Page.frameNavigated" && params.frame && !params.frame.parentId) {
-      mainWindow?.webContents.send("recorder:step", {
-        action: "navigate",
-        target: params.frame.url,
-        value: "",
-        timestamp: Date.now(),
-      });
-    }
-  });
+  // click/type/select/assert キャプチャ
+  // console-message と Runtime.consoleAPICalled の重複を防ぐための timestamp 記録
+  const processedStepTimestamps = new Set<number>();
 
-  // click/type/select/assert キャプチャ (console.debug 経由)
-  // Electron 35+: console-message は Event オブジェクト形式
-  wc.on("console-message", (event: { message: string; level: number }) => {
-    if (!isRecording) return;
-    const message = event.message;
+  function processRecorderMessage(message: string) {
     if (message.startsWith("__storywright_step__")) {
       try {
         const step = JSON.parse(message.replace("__storywright_step__", ""));
+        if (step.timestamp && processedStepTimestamps.has(step.timestamp)) return;
+        if (step.timestamp) processedStepTimestamps.add(step.timestamp);
+        // ソース webContents が変わったら activate-tab ステップを自動挿入（ADR-023）
+        if (lastRecordingWebContentsId !== null && lastRecordingWebContentsId !== wc.id) {
+          const url = wc.isDestroyed() ? "" : wc.getURL();
+          if (url) {
+            mainWindow?.webContents.send("recorder:step", {
+              action: "activate-tab",
+              target: url,
+              value: "",
+              timestamp: Date.now(),
+            });
+          }
+        }
+        lastRecordingWebContentsId = wc.id;
         mainWindow?.webContents.send("recorder:step", step);
       } catch {
         // パース失敗は無視
@@ -1014,6 +1062,54 @@ function setupRecorderOnWebview(wc: Electron.WebContents) {
     if (message === "__storywright_assert_done__") {
       mainWindow?.webContents.send("recorder:assert-done");
     }
+  }
+
+  // CDP イベントキャプチャ（navigate + console.debug のフォールバック）
+  wc.debugger.sendCommand("Runtime.enable").catch(() => {});
+  wc.debugger.on("message", (_event, method, params) => {
+    if (!isRecording) return;
+    // navigate キャプチャ (Page.frameNavigated)
+    if (method === "Page.frameNavigated" && params.frame && !params.frame.parentId) {
+      const frameUrl = params.frame.url;
+      // about:blank はスキップ（popup 初期ページ等）
+      if (!frameUrl || frameUrl === "about:blank") return;
+      // ソース webContents が変わったら activate-tab を挿入（ADR-023）
+      if (lastRecordingWebContentsId !== null && lastRecordingWebContentsId !== wc.id) {
+        const url = wc.isDestroyed() ? "" : wc.getURL();
+        if (url) {
+          mainWindow?.webContents.send("recorder:step", {
+            action: "activate-tab",
+            target: url,
+            value: "",
+            timestamp: Date.now(),
+          });
+        }
+      }
+      lastRecordingWebContentsId = wc.id;
+      mainWindow?.webContents.send("recorder:step", {
+        action: "navigate",
+        target: params.frame.url,
+        value: "",
+        timestamp: Date.now(),
+      });
+    }
+    // Runtime.bindingCalled: recorder からの直接メッセージ（popup でも確実に届く）
+    if (method === "Runtime.bindingCalled" && params.name === "__storywrightSendMessage") {
+      processRecorderMessage(params.payload);
+    }
+    // console.debug キャプチャ (Runtime.consoleAPICalled) — binding 未対応時のフォールバック
+    if (method === "Runtime.consoleAPICalled" && params.type === "debug" && params.args?.length > 0) {
+      const message = params.args[0]?.value ?? "";
+      if (typeof message === "string") {
+        processRecorderMessage(message);
+      }
+    }
+  });
+
+  // Electron console-message（Electron 35+ Event オブジェクト形式）
+  wc.on("console-message", (event: { message: string; level: number }) => {
+    if (!isRecording) return;
+    processRecorderMessage(event.message);
   });
 }
 
@@ -1200,10 +1296,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("preview:activate-tab", async (_event, tabId: string) => {
-    if (!previewTabs.some((tab) => tab.id === tabId)) return;
+    const tab = previewTabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    const previousTabId = activePreviewTabId;
     activePreviewTabId = tabId;
     syncPreviewViews();
     sendPreviewState();
+    // activate-tab ステップは手動タブ切り替えでも自動挿入される
+    // （processRecorderMessage でソース webContents の変化を検知）
   });
 
   ipcMain.handle("preview:load-url", async (_event, url: string) => {
@@ -1244,7 +1344,20 @@ function registerIpcHandlers() {
         throw new Error("Active preview が見つかりません。");
       }
       await waitForWebContentsReady(wc);
-      return wc.executeJavaScript(script);
+      // CDP Runtime.evaluate を使用（addScriptToEvaluateOnNewDocument で注入された
+      // recorder と同じ実行コンテキストで動作させるため）
+      try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
+      await wc.debugger.sendCommand("Runtime.enable");
+      const result = await wc.debugger.sendCommand("Runtime.evaluate", {
+        expression: script,
+        returnByValue: true,
+        awaitPromise: true,
+      }) as { result?: { value?: unknown }; exceptionDetails?: { text?: string; exception?: { description?: string } } };
+      if (result.exceptionDetails) {
+        const desc = result.exceptionDetails.exception?.description || result.exceptionDetails.text || "Evaluation failed";
+        throw new Error(desc);
+      }
+      return result.result?.value ?? null;
     });
     ipcMain.handle("test:export-to-file", async (_event, data: unknown, filePath: string) => {
       fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
@@ -1262,6 +1375,7 @@ function registerIpcHandlers() {
       throw new Error("Preview が見つかりません。Preview タブを開いてください。");
     }
     isRecording = true;
+    lastRecordingWebContentsId = null;
     for (const wc of allWc) {
       setupRecorderOnWebview(wc);
     }
@@ -1294,6 +1408,8 @@ function registerIpcHandlers() {
 (function() {
   if (window.__storywrightExecutor) return;
   window.__storywrightExecutor = true;
+  // replay 中は window.close() を無効化（popup の close でタブが破壊されるのを防ぐ）
+  window.close = function() {};
 
   function resolveSelector(selector) {
     function getSearchDocuments() {
@@ -1558,7 +1674,7 @@ function registerIpcHandlers() {
     status: "passed" | "failed";
     stepResults: StepResult[];
   }> {
-    const wc = getActivePreviewContents();
+    let wc = getActivePreviewContents();
     if (!wc) {
       throw new Error("Preview が見つかりません。Preview タブを開いてください。");
     }
@@ -1627,12 +1743,59 @@ function registerIpcHandlers() {
             }
           : step;
 
-        if (resolvedStep.action === "navigate") {
+        if (resolvedStep.action === "activate-tab") {
+          // タブ切り替え（ADR-023）: URL が一致するタブを探して activate
+          const targetUrl = resolvedStep.target;
+          let found = false;
+          const deadline = Date.now() + 5000;
+          while (Date.now() < deadline) {
+            const matchTab = previewTabs.find((t) => {
+              if (t.view.webContents.isDestroyed()) return false;
+              try {
+                const tabUrl = t.view.webContents.getURL();
+                return tabUrl === targetUrl || tabUrl.startsWith(targetUrl);
+              } catch { return false; }
+            });
+            if (matchTab) {
+              activePreviewTabId = matchTab.id;
+              syncPreviewViews();
+              sendPreviewState();
+              wc = matchTab.view.webContents;
+              try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
+              await wc.debugger.sendCommand("Runtime.enable");
+              await wc.debugger.sendCommand("Runtime.evaluate", {
+                expression: EXECUTOR_INJECTION_SCRIPT,
+                returnByValue: true,
+              });
+              currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+              found = true;
+              break;
+            }
+            await new Promise((r) => setTimeout(r, 200));
+          }
+          if (!found) {
+            // タブが見つからない場合: アクティブタブを targetUrl にナビゲートして復帰
+            const activeWc = getActivePreviewContents();
+            if (activeWc && !activeWc.isDestroyed()) {
+              try {
+                // Electron API で直接ナビゲート（CDP Page.navigate はハングする場合がある）
+                await activeWc.loadURL(targetUrl);
+                try { activeWc.debugger.attach("1.3"); } catch { /* already attached */ }
+                await activeWc.debugger.sendCommand("Runtime.enable");
+                await activeWc.debugger.sendCommand("Runtime.evaluate", {
+                  expression: EXECUTOR_INJECTION_SCRIPT,
+                  returnByValue: true,
+                });
+                wc = activeWc;
+                currentExecutionUrl = targetUrl;
+                found = true;
+              } catch { /* ignore */ }
+            }
+          }
+        } else if (resolvedStep.action === "navigate") {
           const url = resolveUrl(resolvedStep.target, currentExecutionUrl ?? story.baseUrl);
           currentExecutionUrl = url;
           // CDP で navigate + Runtime.evaluate でエンジン注入
-          // executeJavaScript はページロード完了を待つため遅い。
-          // Runtime.evaluate ならロード中でもスクリプトを注入できる。
           try { wc.debugger.attach("1.3"); } catch { /* already attached */ }
           await wc.debugger.sendCommand("Page.enable");
           await wc.debugger.sendCommand("Runtime.enable");
@@ -1677,21 +1840,32 @@ function registerIpcHandlers() {
               throw error;
             }
 
-            await waitForWebContentsReady(wc);
-            await wc.debugger.sendCommand("Runtime.evaluate", {
-              expression: EXECUTOR_INJECTION_SCRIPT,
-              returnByValue: true,
-            });
-            // click によるナビゲーション復帰後に DOM 安定待機（ADR-022 Phase 3）
-            try {
-              await wc.debugger.sendCommand("Runtime.evaluate", {
-                expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
-                returnByValue: true,
-                awaitPromise: true,
-              });
-            } catch { /* ignore */ }
-            currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
-            evalResult = { result: { value: { status: "passed" } } };
+            // click がナビゲーション or popup close をトリガーした場合の復帰
+            // popup の window.close() では webContents が非同期で destroy されるため
+            // isDestroyed() が即座に true にならないケースがある
+            if (wc.isDestroyed()) {
+              evalResult = { result: { value: { status: "passed" } } };
+            } else {
+              try {
+                await waitForWebContentsReady(wc);
+                await wc.debugger.sendCommand("Runtime.evaluate", {
+                  expression: EXECUTOR_INJECTION_SCRIPT,
+                  returnByValue: true,
+                });
+                // click によるナビゲーション復帰後に DOM 安定待機（ADR-022 Phase 3）
+                try {
+                  await wc.debugger.sendCommand("Runtime.evaluate", {
+                    expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
+                    returnByValue: true,
+                    awaitPromise: true,
+                  });
+                } catch { /* ignore */ }
+                currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+              } catch {
+                // 復帰失敗 = popup が閉じて webContents が destroy された
+              }
+              evalResult = { result: { value: { status: "passed" } } };
+            }
           }
           if (evalResult.exceptionDetails) {
             const exceptionText = evalResult.exceptionDetails.text || "Step execution failed";
@@ -1700,20 +1874,26 @@ function registerIpcHandlers() {
               /Execution context was destroyed|navigated or clos|Target closed/i.test(exceptionText);
 
             if (navigationTriggeredContextReset) {
-              await waitForWebContentsReady(wc);
-              await wc.debugger.sendCommand("Runtime.evaluate", {
-                expression: EXECUTOR_INJECTION_SCRIPT,
-                returnByValue: true,
-              });
-              // exceptionDetails 経路の復帰後も DOM 安定待機（ADR-022 Phase 3）
-              try {
-                await wc.debugger.sendCommand("Runtime.evaluate", {
-                  expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
-                  returnByValue: true,
-                  awaitPromise: true,
-                });
-              } catch { /* ignore */ }
-              currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+              if (!wc.isDestroyed()) {
+                try {
+                  await waitForWebContentsReady(wc);
+                  await wc.debugger.sendCommand("Runtime.evaluate", {
+                    expression: EXECUTOR_INJECTION_SCRIPT,
+                    returnByValue: true,
+                  });
+                  // exceptionDetails 経路の復帰後も DOM 安定待機（ADR-022 Phase 3）
+                  try {
+                    await wc.debugger.sendCommand("Runtime.evaluate", {
+                      expression: "window.__storywrightWaitForDomSettle ? window.__storywrightWaitForDomSettle() : Promise.resolve()",
+                      returnByValue: true,
+                      awaitPromise: true,
+                    });
+                  } catch { /* ignore */ }
+                  currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+                } catch {
+                  // 復帰失敗 = popup close
+                }
+              }
             } else {
               throw new Error(exceptionText);
             }
@@ -1722,7 +1902,9 @@ function registerIpcHandlers() {
           if (evalResult.exceptionDetails == null && (!result || result.status !== "passed")) {
             throw new Error(result?.error || "Step failed");
           }
-          currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+          if (!wc.isDestroyed()) {
+            currentExecutionUrl = /^https?:\/\//.test(wc.getURL()) ? wc.getURL() : currentExecutionUrl;
+          }
         }
         const durationMs = Date.now() - start;
         stepResults.push({ order: step.order, status: "passed", durationMs });

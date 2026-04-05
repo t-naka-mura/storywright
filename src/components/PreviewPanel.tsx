@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { PreviewState, PreviewTabState } from "../types";
+import { CloseIcon, RecordIcon, GlobeIcon } from "./Icons";
 
 let pendingInitialPreviewUrl: string | null = null;
 
@@ -218,7 +219,7 @@ export function PreviewPanel({
               }}
               title="タブを閉じる"
             >
-              ✕
+              <CloseIcon />
             </button>
           </div>
         ))}
@@ -348,7 +349,7 @@ export function PreviewPanel({
                       onDeleteUrlHistory(u);
                     }}
                   >
-                    ✕
+                    <CloseIcon />
                   </button>
                 </div>
               ))}
@@ -360,7 +361,7 @@ export function PreviewPanel({
       {/* 録画バッジ */}
       {isRecording && (
         <div className="preview-recording-badge">
-          ● 録画中 — {recordedStepCount} ステップ記録済み
+          <RecordIcon /> 録画中 — {recordedStepCount} ステップ記録済み
         </div>
       )}
 
@@ -368,7 +369,7 @@ export function PreviewPanel({
         <div ref={previewContainerRef} className="webview-bounds-proxy" />
         {!hasActiveUrl && (
           <div className="preview-empty" style={dropdownOffset > 0 ? { paddingTop: `${dropdownOffset}px` } : undefined}>
-            <p className="preview-empty-icon">🌐</p>
+            <p className="preview-empty-icon"><GlobeIcon size={48} /></p>
             <p className="preview-empty-text">
               上のアドレスバーにサイトの URL を入力してください
             </p>

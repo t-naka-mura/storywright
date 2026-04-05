@@ -1,3 +1,5 @@
+import { StopIcon, CheckIcon, RecordIcon } from "./Icons";
+
 interface ToolbarProps {
   onTogglePanel: () => void;
   isPanelOpen: boolean;
@@ -45,7 +47,7 @@ export function Toolbar({
                 type="button"
                 onClick={onStopRecording}
               >
-                ■ Stop
+                <StopIcon /> Stop
               </button>
               <button
                 className={`btn btn-assert ${isAssertMode ? "btn-assert-active" : ""}`}
@@ -53,7 +55,7 @@ export function Toolbar({
                 onClick={onToggleAssertMode}
                 title="要素をクリックしてアサーションを追加"
               >
-                ✓ Assert
+                <CheckIcon /> Assert
               </button>
             </>
           ) : (
@@ -64,7 +66,7 @@ export function Toolbar({
               disabled={!canRecord}
               title={canRecord ? "録画開始" : "URL を入力してください"}
             >
-              ● REC
+              <RecordIcon /> REC
             </button>
           )}
         <button className="btn btn-panel-toggle" type="button" onClick={onTogglePanel} title={isPanelOpen ? "パネルを閉じる" : "パネルを開く"}>

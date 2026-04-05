@@ -3,6 +3,11 @@ import type { Story, Step, StoryResult, RepeatResult } from "../types";
 import { StepEditor } from "./StepEditor";
 import { createStep, getStoryCreatedAt } from "../lib/storyDocument";
 import { extractEnvironmentVariableNames } from "../lib/environmentRequirements";
+import {
+  DragHandleIcon, CheckIcon, CrossIcon, LockIcon, DuplicateIcon,
+  RecordIcon, CloseIcon, CheckCircleIcon, WarningIcon,
+  HourglassIcon, StopIcon, PlayIcon,
+} from "./Icons";
 
 interface DetailPanelProps {
   isOpen: boolean;
@@ -251,17 +256,17 @@ export function DetailPanel({
                         onDrop={(e) => handleDrop(e, index)}
                         onDragEnd={handleDragEnd}
                       >
-                        <span className="step-drag-handle" title="ドラッグで並び替え">⠿</span>
+                        <span className="step-drag-handle" title="ドラッグで並び替え"><DragHandleIcon /></span>
                         <span className={`step-order ${result ? `step-order-${result.status}` : ""}`}>
                           {result?.status === "passed"
-                            ? "✓"
+                            ? <CheckIcon />
                             : result?.status === "failed"
-                              ? "✗"
+                              ? <CrossIcon />
                               : step.order}
                         </span>
                         <div className="step-content" onClick={() => setEditingIndex(index)}>
                           <span className="step-action">{step.action}</span>
-                          {step.sensitive && <span className="step-sensitive-badge" title="機密値">🔒</span>}
+                          {step.sensitive && <span className="step-sensitive-badge" title="機密値"><LockIcon /></span>}
                           <span className="step-detail">
                             {step.target}
                             {step.value ? ` → ${step.sensitive ? "••••••" : step.value}` : ""}
@@ -279,7 +284,7 @@ export function DetailPanel({
                             handleDuplicateStep(index);
                           }}
                         >
-                          ⧉
+                          <DuplicateIcon />
                         </button>
                         {result && (
                           <span className="step-duration">{result.durationMs}ms</span>
@@ -301,7 +306,7 @@ export function DetailPanel({
         ) : (
           <div className="panel-empty-area">
             <p className="panel-empty">
-              ● REC を押して録画を開始するか、
+              <RecordIcon /> REC を押して録画を開始するか、
               <br />
               録画済みストーリーを選択してください
             </p>
@@ -335,7 +340,7 @@ export function DetailPanel({
                     >
                       {result && (
                         <span className={`story-badge story-badge-${result.status}`}>
-                          {result.status === "passed" ? "✓" : "✗"}
+                          {result.status === "passed" ? <CheckIcon /> : <CrossIcon />}
                         </span>
                       )}
                       <span className="standalone-story-title">{s.title}</span>
@@ -351,7 +356,7 @@ export function DetailPanel({
                           onDeleteStory(s.id);
                         }}
                       >
-                        ✕
+                        <CloseIcon />
                       </button>
                     )}
                   </div>
@@ -384,8 +389,8 @@ export function DetailPanel({
           {repeatResult && !isRunning && (
             <div className="repeat-summary">
               {repeatResult.failedIterations === 0
-                ? `✅ ${repeatResult.passedIterations}/${repeatResult.totalIterations} passed`
-                : `⚠️ ${repeatResult.passedIterations}/${repeatResult.totalIterations} passed, ${repeatResult.failedIterations} failed`}
+                ? <><CheckCircleIcon /> {repeatResult.passedIterations}/{repeatResult.totalIterations} passed</>
+                : <><WarningIcon /> {repeatResult.passedIterations}/{repeatResult.totalIterations} passed, {repeatResult.failedIterations} failed</>}
             </div>
           )}
           <div className="run-count-row">
@@ -407,7 +412,7 @@ export function DetailPanel({
               type="button"
               onClick={onCancelRepeat}
             >
-              ⏳ Running ({repeatProgress.current}/{repeatProgress.total})... ■ Stop
+              <HourglassIcon /> Running ({repeatProgress.current}/{repeatProgress.total})... <StopIcon /> Stop
             </button>
           ) : isRunning ? (
             <button
@@ -415,7 +420,7 @@ export function DetailPanel({
               type="button"
               onClick={onCancelRun}
             >
-              ⏳ Running... ■ Stop
+              <HourglassIcon /> Running... <StopIcon /> Stop
             </button>
           ) : (
             <button
@@ -428,7 +433,7 @@ export function DetailPanel({
               }
               disabled={story.steps.length === 0}
             >
-              ▶ Run
+              <PlayIcon /> Run
             </button>
           )}
         </div>

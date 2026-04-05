@@ -37,3 +37,6 @@ dist-electron/
 
 # Playwright
 test-results/
+
+# electron-builder output
+release/

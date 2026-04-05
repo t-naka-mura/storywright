@@ -1,0 +1,20 @@
+appId: com.storywright.app
+productName: Storywright
+directories:
+  output: release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+mac:
+  category: public.app-category.developer-tools
+  target: dmg
+  identity: null
+dmg:
+  title: Storywright
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

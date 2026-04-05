@@ -6,6 +6,12 @@
 
 ブラウザ操作を記録して、そのまま E2E テストとして実行できる Electron デスクトップアプリ。
 
+## ダウン���ード
+
+[最新版をダウンロード（macOS）](https://github.com/t-naka-mura/storywright/releases/latest)
+
+> 署名なしアプリのため、初回起動時は右クリック →「開く」で起動してください。
+
 ## スタック
 
 - **フロントエンド**: React 19 + TypeScript + Vite

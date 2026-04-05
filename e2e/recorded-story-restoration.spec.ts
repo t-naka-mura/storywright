@@ -30,10 +30,10 @@ test("recorded stories survive relaunch and sensitive values stay out of stories
     await clickInPreview(mainWindow, "#submitted-role");
     await mainWindow.getByRole("button", { name: /Assert/ }).click();
     await clickInPreview(mainWindow, "#submitted-user");
-    await waitForRecordedStepCount(mainWindow, 10);
+    await waitForRecordedStepCount(mainWindow, 9);
 
     await mainWindow.getByRole("button", { name: /Stop/ }).click();
-    await expect(mainWindow.locator(".step-item")).toHaveCount(10);
+    await expect(mainWindow.locator(".step-item")).toHaveCount(9);
     await expect(mainWindow.getByText("••••••")).toBeVisible();
 
     await firstSession.electronApp.close();

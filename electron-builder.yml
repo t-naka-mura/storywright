@@ -13,8 +13,12 @@ dmg:
   title: Storywright
   contents:
     - x: 130
-      y: 220
+      y: 150
     - x: 410
-      y: 220
+      y: 150
       type: link
       path: /Applications
+    - x: 270
+      y: 300
+      type: file
+      path: build/インストール.command

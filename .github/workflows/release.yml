@@ -62,6 +62,11 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - name: Sync package.json version
+        run: |
+          VERSION="${{ steps.version.outputs.tag }}"
+          npm pkg set version="${VERSION#v}"
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm build
